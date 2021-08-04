@@ -243,12 +243,16 @@ main(int argc, char **argv) {
                                 vcf_rec_it_end++;
                                 vcf_list_idx_end++;
                             }
-                            const auto & vcf_rec = vcf_list[vcf_list_idx + (((int)umihash) % (1 + vcf_list_idx_end - vcf_list_idx))];
+                            // const auto & vcf_rec = vcf_list[vcf_list_idx + (((int)umihash) % (1 + vcf_list_idx_end - vcf_list_idx))];
                             // const auto & vcf_rec = *vcf_rec_it;
+                            double allelefrac = (double)0;
+                            bool is_mutated = false;
+for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++) {
+                            const auto & vcf_rec = *vcf_rec_it2;
                             bcf_unpack(vcf_rec, BCF_UN_ALL);
                             int ndst_val = 0;
                             int valsize = bcf_get_format_int32(vcf_hdr, vcf_rec, "FA", &bcffloats, &ndst_val);
-                            const double allelefrac = (ndst_val > 0 ? bcffloats[ndst_val - 1] : defallelefrac);
+                            allelefrac += (ndst_val > 0 ? bcffloats[ndst_val - 1] : defallelefrac);
                             if (mutprob <= allelefrac) {
                                 const char *newref = vcf_rec->d.allele[0];
                                 const char *newalt = vcf_rec->d.allele[1];
@@ -289,7 +293,11 @@ main(int argc, char **argv) {
                                     fprintf(stderr, "The variant at tid %d pos %d failed to be processed!\n", bam_rec->core.tid, bam_rec->core.pos);
                                 }
                                 num_kept_reads++;
-                            } else {
+                                is_mutated = true;
+                                break;
+                            } 
+}
+                            if (!is_mutated) {
                                 const char nuc = seq_nt16_str[bam_seqi(seq, qpos)];
                                 newseq.push_back(nuc);
                                 newqual.push_back(qual[qpos]);
@@ -297,7 +305,7 @@ main(int argc, char **argv) {
                             }
                         } else {
                             const char nuc = seq_nt16_str[bam_seqi(seq, qpos)];
-                            newseq.push_back(seq_nt16_str[bam_seqi(seq, qpos)]);
+                            newseq.push_back(nuc);
                             newqual.push_back(qual[qpos]);
                             num_skip_cmatches++;
                         }
