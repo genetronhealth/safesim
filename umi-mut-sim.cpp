@@ -148,9 +148,9 @@ void help(int argc, char **argv) {
     fprintf(stderr, " -f Fraction of variant allele (FA) to simulate. "
             "This value is overriden by the FA tag in the INPUT-VCF [default to %f].\n", DEFAULT_ALLELE_FRAC);
     fprintf(stderr, " -x Phred-scale sequencing error rates of simulated SNV variants "
-            "where -2 means zero error and -1 means using sequencer BQ [default to %f].\n", DEFAULT_SNV_BQ_PHRED);
+            "where -2 means zero error and -1 means using sequencer BQ [default to %d].\n", DEFAULT_SNV_BQ_PHRED);
     fprintf(stderr, " -i The base quality of the inserted bases in the simulated insertion variants. "
-            "[default to %f].\n", DEFAULT_INS_BQ_PHRED);
+            "[default to %d].\n", DEFAULT_INS_BQ_PHRED);
     fprintf(stderr, "Note:\n");
     fprintf(stderr, "INPUT-BAM and INPUT-VCF both have to be sorted and indexed\n");
     fprintf(stderr, "Each variant record in the INPUT-VCF needs to have only one variant, it cannot be multiallelic.\n");
