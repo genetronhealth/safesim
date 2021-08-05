@@ -7,8 +7,9 @@
 #include <string>
 #include <vector>
 
-#include <unistd.h>
 #include <stdio.h>
+#include <math.h>
+#include <unistd.h>
 
 /**
 >>> This is the pseudocode for the simulator
@@ -24,10 +25,25 @@ for each read in the sorted bam
     flush out this bam read
 **/
 
+const char *GIT_DIFF_FULL =
+#include "gitdiff.txt"
+;
+
 const double DEFAULT_ALLELE_FRAC = 0.1;
+const int DEFAULT_SNV_BQ_PHRED = -1;
+const int DEFAULT_INS_BQ_PHRED = 30;
+
+const char *ACGT = "ACGT";
 
 bool ispowerof2(int n) {
     return 0 == (n & (n-1));
+}
+
+double phred2prob(int8_t phred) {
+    return pow(10.0, -(phred / 10.0));
+}
+int prob2phred(double prob) {
+    return -(int)round(10.0 / log(10.0) * log(prob));
 }
 
 double umistr2prob(const char *str, uint32_t &umihash) {
@@ -35,6 +51,12 @@ double umistr2prob(const char *str, uint32_t &umihash) {
     const char *umistr = (NULL == umistr1 ? str : umistr1);
     uint32_t k = __ac_Wang_hash(__ac_X31_hash_string(umistr) ^ 0);
     umihash = k;
+    return (double)(k&0xffffff) / 0x1000000;
+}
+
+double qnameqpos2prob(const char *qname, int qpos, uint32_t &hash) {
+    uint32_t k = __ac_Wang_hash(__ac_X31_hash_string(qname) ^ qpos);
+    hash = k;
     return (double)(k&0xffffff) / 0x1000000;
 }
 
@@ -119,14 +141,21 @@ int bamrec_write_fastq(const bam1_t *aln, std::string &seq, std::string &qual, g
 }
 
 void help(int argc, char **argv) {
+    fprintf(stderr, "Program %s version %s (%s)\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH);
+    
     fprintf(stderr, "Usage: %s -b <INPUT-BAM> -v <INPUT-VCF> -1 <OUTPUT-R1-FASTQ> -2 <OUTPUT-R1-FASTQ>\n", argv[0]);
     fprintf(stderr, "Optional parameters:\n");
-    fprintf(stderr, " -f fraction of variant allele (FA) to simulate. "
+    fprintf(stderr, " -f Fraction of variant allele (FA) to simulate. "
             "This value is overriden by the FA tag in the INPUT-VCF [default to %f].\n", DEFAULT_ALLELE_FRAC);
+    fprintf(stderr, " -x Phred-scale sequencing error rates of simulated SNV variants "
+            "where -2 means zero error and -1 means using sequencer BQ [default to %f].\n", DEFAULT_SNV_BQ_PHRED);
+    fprintf(stderr, " -i The base quality of the inserted bases in the simulated insertion variants. "
+            "[default to %f].\n", DEFAULT_INS_BQ_PHRED);
     fprintf(stderr, "Note:\n");
     fprintf(stderr, "INPUT-BAM and INPUT-VCF both have to be sorted and indexed\n");
     fprintf(stderr, "Each variant record in the INPUT-VCF needs to have only one variant, it cannot be multiallelic.\n");
-    fprintf(stderr, "Currently, the simulation of InDel variants is not supported yet!\n");
+    fprintf(stderr, "Currently, the simulation of insertion/deletion variants causes longer/shorter-than-expected lengths of read template sequences due to preservation of alignment start and end positions on the reference genome.\n");
+    
     exit(-1);
 }
 
@@ -139,7 +168,9 @@ main(int argc, char **argv) {
     char *r1outfq = NULL;
     char *r2outfq = NULL;
     double defallelefrac = DEFAULT_ALLELE_FRAC;
-    
+    int snv_bq_phred = DEFAULT_SNV_BQ_PHRED;
+    int ins_bq_phred = DEFAULT_INS_BQ_PHRED;
+
     while ((opt = getopt(argc, argv, "b:v:1:2:f:")) != -1) {
         switch (opt) {
             case 'b': inbam = optarg; break;
@@ -147,12 +178,17 @@ main(int argc, char **argv) {
             case '1': r1outfq = optarg; break;
             case '2': r2outfq = optarg; break;
             case 'f': defallelefrac = atof(optarg); break;
+            case 'i': ins_bq_phred = atof(optarg); break;
+            case 'x': snv_bq_phred = atof(optarg); break;
             default: help(argc, argv);
         }
     }
     if (NULL == inbam || NULL == invcf || NULL == r1outfq || NULL == r2outfq) {
         help(argc, argv);
     }
+    
+    fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
+    
     int64_t num_kept_reads = 0;
     int64_t num_kept_snv = 0;
     int64_t num_kept_mnv = 0;
@@ -185,6 +221,7 @@ main(int argc, char **argv) {
         const bam1_t *bam_rec = bam_rec1;
         if (0 != (bam_rec->core.flag & 0x900)) { continue; }
         while (is_var1_before_var2(vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_rec->core.pos)) {
+
             if (vcf_read_ret != -1) {
                 fprintf(stderr, "The variant at tid %d pos %d is before the read at tid %d pos %d, readname = %s\n", 
                     vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_rec->core.pos, bam_get_qname(bam_rec));
@@ -257,7 +294,12 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                 const char *newref = vcf_rec->d.allele[0];
                                 const char *newalt = vcf_rec->d.allele[1];
                                 if (1 == strlen(newref) && 1 == strlen(newalt)) {
-                                    newseq.push_back(newalt[0]);
+                                    uint32_t hash = 0;
+                                    double randprob = qnameqpos2prob(bam_get_qname(bam_rec), qpos, hash);
+                                    const char base = ((-2 == snv_bq_phred)
+                                            || (prob2phred(randprob) < (-1 == snv_bq_phred ? qual[qpos] : snv_bq_phred)) 
+                                            ? (newalt[0]) : (ACGT[hash % 4]));
+                                    newseq.push_back(base);
                                     newqual.push_back(qual[qpos]);
                                     num_kept_snv++;
                                     if (ispowerof2(num_kept_snv)) { fprintf(stderr, "The read with name %s is spiked with the snv-variant at tid %d pos %d\n", 
@@ -265,7 +307,12 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                 } else if (strlen(newref) == strlen(newalt)) {
                                     fprintf(stderr, "Warning: the MNV at tid %d pos %d is decomposed into SNV and only the first SNV is simulated\n", 
                                             bam_rec->core.tid, bam_rec->core.pos);
-                                    newseq.push_back(newalt[0]);
+                                    uint32_t hash = 0;
+                                    double randprob = qnameqpos2prob(bam_get_qname(bam_rec), qpos, hash);
+                                    const char base = ((-2 == snv_bq_phred)
+                                            || (prob2phred(randprob) < (-1 == snv_bq_phred ? qual[qpos] : snv_bq_phred)) 
+                                            ? (newalt[0]) : (ACGT[hash % 4]));
+                                    newseq.push_back(base);
                                     newqual.push_back(qual[qpos]);
                                     num_kept_mnv++;
                                 } else if (strlen(newref) == 1 && strlen(newalt) >  1) {
@@ -273,7 +320,9 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                         newseq.push_back(newalt[k]); 
                                     }
                                     newqual.push_back(qual[qpos]);
-                                    for (int k = 1; k < strlen(newalt); k++) { newqual.push_back((char)(30)); }
+                                    for (int k = 1; k < strlen(newalt); k++) { 
+                                        newqual.push_back((char)(ins_bq_phred)); 
+                                    }
                                     num_kept_ins++;
                                     if (ispowerof2(num_kept_ins)) { fprintf(stderr, "The read with name %s is spiked with the ins-variant at tid %d pos %d\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); }
