@@ -142,6 +142,7 @@ int bamrec_write_fastq(const bam1_t *aln, std::string &seq, std::string &qual, g
 
 void help(int argc, char **argv) {
     fprintf(stderr, "Program %s version %s (%s)\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH);
+    fprintf(stderr, "  This is a NGS variant simulator that is aware of the molecular-barcodes (also known as unique molecular identifiers (UMIs))\n");
     
     fprintf(stderr, "Usage: %s -b <INPUT-BAM> -v <INPUT-VCF> -1 <OUTPUT-R1-FASTQ> -2 <OUTPUT-R1-FASTQ>\n", argv[0]);
     fprintf(stderr, "Optional parameters:\n");
@@ -152,8 +153,9 @@ void help(int argc, char **argv) {
     fprintf(stderr, " -i The base quality of the inserted bases in the simulated insertion variants. "
             "[default to %d].\n", DEFAULT_INS_BQ_PHRED);
     fprintf(stderr, "Note:\n");
-    fprintf(stderr, "Reads in <OUTPUT-R1-FASTQ> and <OUTPUT-R2-FASTQ> are not in the same order, so these output FASTQ files have to be sorted using a tool such as fastq-sort before being aligned again, as most aligners such as BWA and Bowtie2 require reads in the R1 and R2 files to be in the same order (This is VERY IMPORTANT!). \n");
-    fprintf(stderr, "INPUT-BAM and INPUT-VCF both have to be sorted and indexed\n");
+    fprintf(stderr, "Reads in <OUTPUT-R1-FASTQ> and <OUTPUT-R2-FASTQ> are not in the same order, so these output FASTQ files have to be sorted using a tool such as fastq-sort before being aligned again, as most aligners such as BWA and Bowtie2 require reads in the R1 and R2 files to be in the same order (This is VERY IMPORTANT!).\n");
+    fprintf(stderr, "<INPUT-BAM> and <INPUT-VCF> both have to be sorted and indexed.\n");
+    fprintf(stderr, "To detect UMI, this prgram first checks for the MI tag in each alignment record in <INPUT-BAM>. If the MI tag is absent, then the program checks for the string after the number-hash-pound sign (#) in the read name (QNAME).\n");
     fprintf(stderr, "Each variant record in the INPUT-VCF needs to have only one variant, it cannot be multiallelic.\n");
     fprintf(stderr, "Currently, the simulation of insertion/deletion variants causes longer/shorter-than-expected lengths of read template sequences due to preservation of alignment start and end positions on the reference genome.\n");
     
@@ -257,7 +259,10 @@ main(int argc, char **argv) {
         newqual.clear();
         
         uint32_t umihash = 0;
-        const double mutprob = umistr2prob(bam_get_qname(bam_rec), umihash);
+        const auto *bam_aux_data = bam_aux_get(bam_rec, "MI"); // this tag is reserved (https://samtools.github.io/hts-specs/SAMtags.pdf)
+        const char *umistr = ((bam_aux_data != NULL) ? bam_aux2Z(bam_aux_data) : bam_get_qname(bam_rec));
+        
+        const double mutprob = umistr2prob(umistr, umihash);
         if (vcf_list.size() > 0) {
             int qpos = 0;
             int rpos = bam_rec->core.pos;
