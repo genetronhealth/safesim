@@ -46,16 +46,16 @@ int prob2phred(double prob) {
     return -(int)round(10.0 / log(10.0) * log(prob));
 }
 
-double umistr2prob(const char *str, uint32_t &umihash) {
+double umistr2prob(const char *str, uint32_t &umihash, uint32_t randseed) {
     const char *umistr1 = strchr(str, '#');
     const char *umistr = (NULL == umistr1 ? str : umistr1);
-    uint32_t k = __ac_Wang_hash(__ac_X31_hash_string(umistr) ^ 0);
+    uint32_t k = __ac_Wang_hash(__ac_X31_hash_string(umistr) ^ randseed);
     umihash = k;
     return (double)(k&0xffffff) / 0x1000000;
 }
 
-double qnameqpos2prob(const char *qname, int qpos, uint32_t &hash) {
-    uint32_t k = __ac_Wang_hash(__ac_X31_hash_string(qname) ^ qpos);
+double qnameqpos2prob(const char *qname, int qpos, uint32_t &hash, uint32_t randseed) {
+    uint32_t k = __ac_Wang_hash(__ac_X31_hash_string(qname) ^ ((qpos + 1) * randseed));
     hash = k;
     return (double)(k&0xffffff) / 0x1000000;
 }
@@ -173,10 +173,12 @@ main(int argc, char **argv) {
     double defallelefrac = DEFAULT_ALLELE_FRAC;
     int snv_bq_phred = DEFAULT_SNV_BQ_PHRED;
     int ins_bq_phred = DEFAULT_INS_BQ_PHRED;
+    uint32_t randseed = 13;
 
-    while ((opt = getopt(argc, argv, "b:v:1:2:f:")) != -1) {
+    while ((opt = getopt(argc, argv, "b:v:1:2:f:s:")) != -1) {
         switch (opt) {
             case 'b': inbam = optarg; break;
+            case 's': randseed = atoi(optarg); break;
             case 'v': invcf = optarg; break;
             case '1': r1outfq = optarg; break;
             case '2': r2outfq = optarg; break;
@@ -189,7 +191,10 @@ main(int argc, char **argv) {
     if (NULL == inbam || NULL == invcf || NULL == r1outfq || NULL == r2outfq) {
         help(argc, argv);
     }
-    
+    if (0 != randseed) {
+        srand(randseed);
+        randseed = (uint32_t)rand();
+    }
     fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
     
     int64_t num_kept_reads = 0;
@@ -262,7 +267,7 @@ main(int argc, char **argv) {
         const auto *bam_aux_data = bam_aux_get(bam_rec, "MI"); // this tag is reserved (https://samtools.github.io/hts-specs/SAMtags.pdf)
         const char *umistr = ((bam_aux_data != NULL) ? bam_aux2Z(bam_aux_data) : bam_get_qname(bam_rec));
         
-        const double mutprob = umistr2prob(umistr, umihash);
+        const double mutprob = umistr2prob(umistr, umihash, randseed);
         if (vcf_list.size() > 0) {
             int qpos = 0;
             int rpos = bam_rec->core.pos;
@@ -301,7 +306,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                 const char *newalt = vcf_rec->d.allele[1];
                                 if (1 == strlen(newref) && 1 == strlen(newalt)) {
                                     uint32_t hash = 0;
-                                    double randprob = qnameqpos2prob(bam_get_qname(bam_rec), qpos, hash);
+                                    double randprob = qnameqpos2prob(bam_get_qname(bam_rec), qpos, hash, randseed);
                                     const char base = ((-2 == snv_bq_phred)
                                             || (prob2phred(randprob) < (-1 == snv_bq_phred ? qual[qpos] : snv_bq_phred)) 
                                             ? (newalt[0]) : (ACGT[hash % 4]));
@@ -314,7 +319,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     fprintf(stderr, "Warning: the MNV at tid %d pos %d is decomposed into SNV and only the first SNV is simulated\n", 
                                             bam_rec->core.tid, bam_rec->core.pos);
                                     uint32_t hash = 0;
-                                    double randprob = qnameqpos2prob(bam_get_qname(bam_rec), qpos, hash);
+                                    double randprob = qnameqpos2prob(bam_get_qname(bam_rec), qpos, hash, randseed);
                                     const char base = ((-2 == snv_bq_phred)
                                             || (prob2phred(randprob) < (-1 == snv_bq_phred ? qual[qpos] : snv_bq_phred)) 
                                             ? (newalt[0]) : (ACGT[hash % 4]));
