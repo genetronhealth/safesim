@@ -1,3 +1,5 @@
+#include "portable_rand.h"
+
 #include "htslib/khash.h"
 #include "htslib/sam.h"
 #include "htslib/vcf.h"
@@ -5,7 +7,6 @@
 
 #include <deque>
 #include <string>
-#include <vector>
 
 #include <stdio.h>
 #include <math.h>
@@ -192,8 +193,8 @@ main(int argc, char **argv) {
         help(argc, argv);
     }
     if (0 != randseed) {
-        srand(randseed);
-        randseed = (uint32_t)rand();
+        portable_srand(randseed);
+        randseed = (uint32_t)portable_rand();
     }
     fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
     
@@ -218,7 +219,6 @@ main(int argc, char **argv) {
     gzFile r2file = gzopen(r2outfq, "wb1");
     
     std::deque<bcf1_t*> vcf_list;
-    std::vector<bam1_t*> bam_list;
     
     float bcffloats[256] = {0};
     
