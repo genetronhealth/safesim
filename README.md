@@ -28,5 +28,7 @@ For example, the UMI-labeled read name can be
 
 # Other things
 
+The word "safe" refers to the Safe-Sequencing System (Safe-SeqS) first described at https://doi.org/10.1073/pnas.1105422108 
+
 For more information, please check the wiki.
 
