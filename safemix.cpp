@@ -57,13 +57,13 @@ void help(int argc, char **argv) {
     
     fprintf(stderr, "Usage: %s -o <OUTPUT-PREFIX> -a <tumor-INPUT-BAM> -b <normal-INPUT-BAM>\n", argv[0]);
     fprintf(stderr, "Optional parameters:\n");
-    fprintf(stderr, "  -d <tumor-umi-size> average number of reads in a UMI family in the <TUMOR-INPUT-BAM> file\n"); 
-    fprintf(stderr, "  -e <normal-umi-size> average number of reads in a UMI family in the <NORMAL-INPUT-BAM> file\n");
-    fprintf(stderr, "  -f <tumor-allele-fraction> \n"); 
-    fprintf(stderr, "  -i <tumor-initial-quantity> initial quantity of DNA in ng sequenced in the <TUMOR-INPUT-BAM> file \n");
-    fprintf(stderr, "  -j <normal-initial-quantity> initial quantity of DNA in ng sequenced in the <NORMAL-INPUT-BAM> file \n");
-    fprintf(stderr, "  -r <random-seed-for-initial-quantity> random seed used to select the UMI from the initial quantity of DNA\n");
-    fprintf(stderr, "  -s <random-seed-for-umi-size>\n random seed used to select the reads in each UMI\n");
+    fprintf(stderr, "  -d <tumor-umi-size> average number of reads in a UMI family in the <TUMOR-INPUT-BAM> file [default to %f]\n", arg_default_vals.d); 
+    fprintf(stderr, "  -e <normal-umi-size> average number of reads in a UMI family in the <NORMAL-INPUT-BAM> file [default to %f]\n", arg_default_vals.e);
+    fprintf(stderr, "  -f <tumor-allele-fraction> [default to %f]\n", arg_default_vals.f); 
+    fprintf(stderr, "  -i <tumor-initial-quantity> initial quantity of DNA in ng sequenced in the <TUMOR-INPUT-BAM> file [default to %f]\n", arg_default_vals.i);
+    fprintf(stderr, "  -j <normal-initial-quantity> initial quantity of DNA in ng sequenced in the <NORMAL-INPUT-BAM> file [default to %f]\n",  arg_default_vals.j);
+    fprintf(stderr, "  -r <random-seed-for-initial-quantity> random seed used to select the UMI from the initial quantity of DNA [default to %d]\n", arg_default_vals.r);
+    fprintf(stderr, "  -s <random-seed-for-umi-size>\n random seed used to select the reads in each UMI,  [default to %d]\n",  arg_default_vals.s);
     
     fprintf(stderr, "Note:\n");
     fprintf(stderr, "<tumor-INPUT-BAM> and <normal-INPUT-BAM> both have to be sorted and indexed.\n");
