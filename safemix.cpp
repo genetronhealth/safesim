@@ -63,7 +63,8 @@ void help(int argc, char **argv) {
     fprintf(stderr, "  -i <tumor-initial-quantity> initial quantity of DNA in ng sequenced in the <TUMOR-INPUT-BAM> file [default to %f]\n", arg_default_vals.i);
     fprintf(stderr, "  -j <normal-initial-quantity> initial quantity of DNA in ng sequenced in the <NORMAL-INPUT-BAM> file [default to %f]\n",  arg_default_vals.j);
     fprintf(stderr, "  -r <random-seed-for-initial-quantity> random seed used to select the UMI from the initial quantity of DNA [default to %d]\n", arg_default_vals.r);
-    fprintf(stderr, "  -s <random-seed-for-umi-size>\n random seed used to select the reads in each UMI,  [default to %d]\n",  arg_default_vals.s);
+    fprintf(stderr, "  -s <random-seed-for-umi-size>\n random seed used to select the reads in each UMI [default to %d]\n",  arg_default_vals.s);
+    fprintf(stderr, "  -U <use-only-umi>\n set the program to use only UMIs for identifying read families (discard read start and end positions) [default to unset]\n");
     
     fprintf(stderr, "Note:\n");
     fprintf(stderr, "<tumor-INPUT-BAM> and <normal-INPUT-BAM> both have to be sorted and indexed.\n");
@@ -92,8 +93,9 @@ main(int argc, char **argv) {
     double defallelefrac = arg_default_vals.f;
     uint32_t randseed1 = arg_default_vals.r;
     uint32_t randseed2 = arg_default_vals.s;
+    int use_only_umi = 0;
     
-    while ((opt = getopt(argc, argv, "a:b:d:e:f:i:j:o:r:s:")) != -1) {
+    while ((opt = getopt(argc, argv, "a:b:d:e:f:i:j:o:r:s:U")) != -1) {
         switch (opt) {
             case 'a': tbam = optarg; break;
             case 'b': nbam = optarg; break;
@@ -105,6 +107,7 @@ main(int argc, char **argv) {
             case 'o': outpref = optarg; break;
             case 'r': randseed1 = atoi(optarg); break;
             case 's': randseed2 = atoi(optarg); break;
+            case 'U': use_only_umi = 1;
             default: help(argc, argv);
         }
     }
@@ -156,7 +159,9 @@ main(int argc, char **argv) {
             if (0 != (bam_rec->core.flag & 0x900)) { continue; }
             const auto *bam_aux_data = bam_aux_get(bam_rec, "MI"); // this tag is reserved (https://samtools.github.io/hts-specs/SAMtags.pdf)
             const char *umistr = ((bam_aux_data != NULL) ? bam_aux2Z(bam_aux_data) : bam_get_qname(bam_rec));
-            const double prob1 = umistr2prob(umistr, MIN(bam_rec->core.pos, bam_rec->core.mpos), abs(bam_rec->core.isize), randseed1);
+            const auto abegin = (use_only_umi ? (0) : MIN(bam_rec->core.pos, bam_rec->core.mpos));
+            const auto aisize = (use_only_umi ? (0) : abs(bam_rec->core.isize));
+            const double prob1 = umistr2prob(umistr, abegin, aisize, randseed1);
             const double prob2 = qname2prob(bam_get_qname(bam_rec), randseed2);
             if (prob1 < umi_draw_prob && prob2 < read_draw_given_umi_prob) {
                 int write_ret = sam_write1(outbam_fp, bam_hdr, bam_rec);
