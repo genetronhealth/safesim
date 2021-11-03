@@ -59,7 +59,7 @@ void help(int argc, char **argv) {
     fprintf(stderr, "Optional parameters:\n");
     fprintf(stderr, "  -d <tumor-umi-size> average number of reads in a UMI family in the <TUMOR-INPUT-BAM> file [default to %f]\n", arg_default_vals.d); 
     fprintf(stderr, "  -e <normal-umi-size> average number of reads in a UMI family in the <NORMAL-INPUT-BAM> file [default to %f]\n", arg_default_vals.e);
-    fprintf(stderr, "  -f <tumor-allele-fraction> [default to %f]\n", arg_default_vals.f); 
+    fprintf(stderr, "  -f <tumor-fraction> the fraction of DNA that comes from tumor [default to %f]\n", arg_default_vals.f); 
     fprintf(stderr, "  -i <tumor-initial-quantity> initial quantity of DNA in ng sequenced in the <TUMOR-INPUT-BAM> file [default to %f]\n", arg_default_vals.i);
     fprintf(stderr, "  -j <normal-initial-quantity> initial quantity of DNA in ng sequenced in the <NORMAL-INPUT-BAM> file [default to %f]\n",  arg_default_vals.j);
     fprintf(stderr, "  -r <random-seed-for-initial-quantity> random seed used to select the UMI from the initial quantity of DNA [default to %d]\n", arg_default_vals.r);
@@ -99,15 +99,15 @@ main(int argc, char **argv) {
         switch (opt) {
             case 'a': tbam = optarg; break;
             case 'b': nbam = optarg; break;
-            case 'd': tosd = atof(optarg);
-            case 'e': nosd = atof(optarg);
+            case 'd': tosd = atof(optarg); break;
+            case 'e': nosd = atof(optarg); break;
             case 'f': defallelefrac = atof(optarg); break;
-            case 'i': tiq = atof(optarg);
-            case 'j': niq = atof(optarg);
+            case 'i': tiq = atof(optarg); break;
+            case 'j': niq = atof(optarg); break;
             case 'o': outpref = optarg; break;
             case 'r': randseed1 = atoi(optarg); break;
             case 's': randseed2 = atoi(optarg); break;
-            case 'U': use_only_umi = 1;
+            case 'U': use_only_umi = 1; break;
             default: help(argc, argv);
         }
     }
