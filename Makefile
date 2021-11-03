@@ -4,7 +4,7 @@ COMMIT_DIFF_FULL=$(shell echo "R\"ZXF_specQUOTE(\n $$(git diff HEAD | sed 's/ZXF
 VERFLAGS=-DCOMMIT_VERSION="\"$(COMMIT_VERSION)\"" -DCOMMIT_DIFF_SH="\"$(COMMIT_DIFF_SH)\"" -DCOMMIT_DIFF_FULL="\"$(COMMIT_DIFF_FULL)\""
 CXXFLAGS=-static-libstdc++ ext/htslib-1.11-lowdep/libhts.a -I ext/htslib-1.11-lowdep/ -pthread -lm -lz -lbz2 -llzma
 
-all: safemut safemut.debug safemix
+all: safemut safemut.debug safemix safemix.debug
 	
 safemut : safemut.cpp Makefile
 	g++ -o safemut -O2 safemut.cpp $(CXXFLAGS) $(VERFLAGS)
@@ -12,11 +12,13 @@ safemut.debug : safemut.cpp Makefile
 	g++ -o safemut.debug -O0 -g -p -fsanitize=address safemut.cpp $(CXXFLAGS) $(VERFLAGS)
 safemix : safemix.cpp Makefile
 	g++ -o safemix -O2 safemix.cpp $(CXXFLAGS) $(VERFLAGS)
+safemix.debug : safemix.cpp Makefile
+	g++ -o safemix.debug -O0 -g -p -fsanitize=address safemix.cpp $(CXXFLAGS) $(VERFLAGS)
 
 .PHONY: clean deploy
 	
 clean:
-	rm safemut safemut.debug safemix bin/safemut bin/safemix
+	rm safemut safemut.debug safemix safemix.debug bin/safemut bin/safemix
 deploy:
 	cp safemut safemix bin/
 
