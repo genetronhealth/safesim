@@ -69,7 +69,7 @@ void help(int argc, char **argv) {
     fprintf(stderr, "Note:\n");
     fprintf(stderr, "<tumor-INPUT-BAM> and <normal-INPUT-BAM> both have to be sorted and indexed.\n");
     fprintf(stderr, "To detect UMI, this prgram first checks for the MI tag in each alignment record in <tumor-INPUT-BAM> and <normal-INPUT-BAM>. If the MI tag is absent, then the program checks for the string after the number-hash-pound sign (#) in the read name (QNAME).\n");
-    fprintf(stderr, "<OUTPUT-PREFIX> is appended by the string literals \".tumor.bam\" and \".normal.bam\" (without the double quotes) to generate the tumor and normal simulated BAM filenames, respectively.\n");
+    fprintf(stderr, "<OUTPUT-PREFIX> is appended by the string literals \".tumor.bam\" and \".normal.bam\" (without the double quotes) to generate the tumor and normal simulated BAM filenames, respectively. The tumor and normal bam files have to be merged (e.g., by samtools merge) to simulate the sequenced sample. \n");
     exit(-1);
 }
 

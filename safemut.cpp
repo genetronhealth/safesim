@@ -148,11 +148,15 @@ void help(int argc, char **argv) {
     fprintf(stderr, "Usage: %s -b <INPUT-BAM> -v <INPUT-VCF> -1 <OUTPUT-R1-FASTQ> -2 <OUTPUT-R1-FASTQ>\n", argv[0]);
     fprintf(stderr, "Optional parameters:\n");
     fprintf(stderr, " -f Fraction of variant allele (FA) to simulate. "
-            "This value is overriden by the FA tag in the INPUT-VCF [default to %f].\n", DEFAULT_ALLELE_FRAC);
+            "This value is overriden by the FA tag (specified by the -F command-line parameter) in the INPUT-VCF [default to %f].\n", DEFAULT_ALLELE_FRAC);
     fprintf(stderr, " -x Phred-scale sequencing error rates of simulated SNV variants "
             "where -2 means zero error and -1 means using sequencer BQ [default to %d].\n", DEFAULT_SNV_BQ_PHRED);
     fprintf(stderr, " -i The base quality of the inserted bases in the simulated insertion variants. "
             "[default to %d].\n", DEFAULT_INS_BQ_PHRED);
+    fprintf(stderr, " -F allele fraction TAG in the VCF file. " "[default to FA].\n");
+    fprintf(stderr, " -S sample name used for the -F command-line parameter. "
+                    "The special values NULL pointer, empty-string, and INFO mean using the INFO column instead of the FORMAT column." "[default to NULL pointer].\n");
+    
     fprintf(stderr, "Note:\n");
     fprintf(stderr, "Reads in <OUTPUT-R1-FASTQ> and <OUTPUT-R2-FASTQ> are not in the same order, so these output FASTQ files have to be sorted using a tool such as fastq-sort before being aligned again, as most aligners such as BWA and Bowtie2 require reads in the R1 and R2 files to be in the same order (This is VERY IMPORTANT!).\n");
     fprintf(stderr, "<INPUT-BAM> and <INPUT-VCF> both have to be sorted and indexed.\n");
@@ -175,8 +179,10 @@ main(int argc, char **argv) {
     int snv_bq_phred = DEFAULT_SNV_BQ_PHRED;
     int ins_bq_phred = DEFAULT_INS_BQ_PHRED;
     uint32_t randseed = 13;
-
-    while ((opt = getopt(argc, argv, "b:v:1:2:f:s:")) != -1) {
+    char *tagFA = "FA";
+    char *tagsample = NULL;
+    
+    while ((opt = getopt(argc, argv, "b:v:1:2:f:i:s:x:F:S:")) != -1) {
         switch (opt) {
             case 'b': inbam = optarg; break;
             case 's': randseed = atoi(optarg); break;
@@ -186,6 +192,8 @@ main(int argc, char **argv) {
             case 'f': defallelefrac = atof(optarg); break;
             case 'i': ins_bq_phred = atof(optarg); break;
             case 'x': snv_bq_phred = atof(optarg); break;
+            case 'F': tagFA = optarg; break;
+            case 'S': tagsample = optarg; break;
             default: help(argc, argv);
         }
     }
@@ -196,6 +204,7 @@ main(int argc, char **argv) {
         portable_srand(randseed);
         randseed = (uint32_t)portable_rand();
     }
+    const bool is_FA_from_INFO = ((tagsample == NULL) || (0 == strlen(tagsample)) || !strcmp("INFO", tagsample));
     fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
     
     int64_t num_kept_reads = 0;
@@ -208,6 +217,12 @@ main(int argc, char **argv) {
     
     htsFile *vcf_fp = vcf_open(invcf, "r");
     bcf_hdr_t *vcf_hdr = bcf_hdr_read(vcf_fp);
+    int tag_sample_idx = bcf_hdr_nsamples(vcf_hdr) - 1; 
+    for (int sidx = 0; sidx < bcf_hdr_nsamples(vcf_hdr); sidx++) {
+        if (!strcmp(tagsample, vcf_hdr->samples[sidx])) {
+            tag_sample_idx = sidx; 
+        }
+    }
     bcf1_t *vcf_rec = bcf_init();
     vcf_rec->rid = -1;
     vcf_rec->pos = 0;
@@ -299,8 +314,14 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                             const auto & vcf_rec = *vcf_rec_it2;
                             bcf_unpack(vcf_rec, BCF_UN_ALL);
                             int ndst_val = 0;
-                            int valsize = bcf_get_format_int32(vcf_hdr, vcf_rec, "FA", &bcffloats, &ndst_val);
-                            allelefrac += (ndst_val > 0 ? bcffloats[ndst_val - 1] : defallelefrac);
+                            int valsize = 0;
+                            if (is_FA_from_INFO) {
+                                valsize = bcf_get_info_float(vcf_hdr, vcf_rec, tagFA, &bcffloats, &ndst_val);
+                                allelefrac += (ndst_val > 0 ? bcffloats[ndst_val - 1] : defallelefrac);
+                            } else {
+                                valsize = bcf_get_format_float(vcf_hdr, vcf_rec, tagFA, &bcffloats, &ndst_val);
+                                allelefrac += (ndst_val > 0 ? bcffloats[tag_sample_idx] : defallelefrac);
+                            }
                             if (mutprob <= allelefrac) {
                                 const char *newref = vcf_rec->d.allele[0];
                                 const char *newalt = vcf_rec->d.allele[1];
