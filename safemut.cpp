@@ -35,6 +35,8 @@ const int DEFAULT_SNV_BQ_PHRED = -1;
 const int DEFAULT_INS_BQ_PHRED = 30;
 
 const char *ACGT = "ACGT";
+const char *TAG_FA = "FA";
+
 
 bool ispowerof2(int n) {
     return 0 == (n & (n-1));
@@ -179,8 +181,8 @@ main(int argc, char **argv) {
     int snv_bq_phred = DEFAULT_SNV_BQ_PHRED;
     int ins_bq_phred = DEFAULT_INS_BQ_PHRED;
     uint32_t randseed = 13;
-    char *tagFA = "FA";
-    char *tagsample = NULL;
+    const char *tagFA = TAG_FA;
+    const char *tagsample = NULL;
     
     while ((opt = getopt(argc, argv, "b:v:1:2:f:i:s:x:F:S:")) != -1) {
         switch (opt) {
