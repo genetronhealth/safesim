@@ -221,7 +221,7 @@ main(int argc, char **argv) {
     bcf_hdr_t *vcf_hdr = bcf_hdr_read(vcf_fp);
     int tag_sample_idx = bcf_hdr_nsamples(vcf_hdr) - 1; 
     for (int sidx = 0; sidx < bcf_hdr_nsamples(vcf_hdr); sidx++) {
-        if (!strcmp(tagsample, vcf_hdr->samples[sidx])) {
+        if ((tagsample != NULL) && !strcmp(tagsample, vcf_hdr->samples[sidx])) {
             tag_sample_idx = sidx; 
         }
     }
