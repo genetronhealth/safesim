@@ -237,8 +237,7 @@ main(int argc, char **argv) {
     
     std::deque<bcf1_t*> vcf_list;
     
-    float bcffloats[256] = {0};
-    
+    float *bcffloats = NULL; // [256] = {0}; 
     int vcf_read_ret = 0;
     
     std::string newseq, newqual;
@@ -319,10 +318,10 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                             int valsize = 0;
                             if (is_FA_from_INFO) {
                                 valsize = bcf_get_info_float(vcf_hdr, vcf_rec, tagFA, &bcffloats, &ndst_val);
-                                allelefrac += (ndst_val > 0 ? bcffloats[ndst_val - 1] : defallelefrac);
+                                allelefrac += (valsize > 0 ? bcffloats[valsize - 1] : defallelefrac);
                             } else {
                                 valsize = bcf_get_format_float(vcf_hdr, vcf_rec, tagFA, &bcffloats, &ndst_val);
-                                allelefrac += (ndst_val > 0 ? bcffloats[tag_sample_idx] : defallelefrac);
+                                allelefrac += ((valsize > 0 && valsize == bcf_hdr_nsamples(vcf_hdr)) ? bcffloats[tag_sample_idx] : defallelefrac);
                             }
                             if (mutprob <= allelefrac) {
                                 const char *newref = vcf_rec->d.allele[0];
@@ -378,7 +377,12 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                 num_kept_reads++;
                                 is_mutated = true;
                                 break;
-                            } 
+                            } else {
+                                if (ispowerof2(num_skip_reads)) {
+                                    fprintf(stderr, "The read with name %s is not affected by the variant at tid %d pos %d\n", 
+                                    bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); 
+                                }
+                            }
 }
                             if (!is_mutated) {
                                 const char nuc = seq_nt16_str[bam_seqi(seq, qpos)];
@@ -419,7 +423,10 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
             bamrec_write_fastq_raw(bam_rec, r1file, r2file);    
         }
     }
-    
+    if (bcffloats != NULL) {
+        free(bcffloats);
+    }
+
     bam_destroy1(bam_rec1);
     bam_hdr_destroy(bam_hdr);
     sam_close(bam_fp);
