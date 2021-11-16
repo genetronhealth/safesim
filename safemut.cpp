@@ -33,10 +33,14 @@ const char *GIT_DIFF_FULL =
 const double DEFAULT_ALLELE_FRAC = 0.1;
 const int DEFAULT_SNV_BQ_PHRED = -1;
 const int DEFAULT_INS_BQ_PHRED = 30;
+const double DEFAULT_POWER_LAW_EXPONENT = 3.0;
+
+const uint32_t DEFAULT_RANDSEED = 13;
+const uint32_t DEFAULT_RANDSEED1 = 31;
+const uint32_t DEFAULT_RANDSEED2 = 61;
 
 const char *ACGT = "ACGT";
 const char *TAG_FA = "FA";
-
 
 bool ispowerof2(int n) {
     return 0 == (n & (n-1));
@@ -61,6 +65,22 @@ double qnameqpos2prob(const char *qname, int qpos, uint32_t &hash, uint32_t rand
     uint32_t k = __ac_Wang_hash(__ac_X31_hash_string(qname) ^ ((qpos + 1) * randseed));
     hash = k;
     return (double)(k&0xffffff) / 0x1000000;
+}
+
+double 
+allelefrac_powlaw_transform(
+        double allelefrac,
+        uint64_t rpos,
+        uint64_t samplehash1,
+        uint64_t samplehash2,
+        uint32_t randseed1,
+        uint32_t randseed2,
+        double exponent) {
+    uint32_t k1 = __ac_Wang_hash(samplehash1 ^ ((rpos + 1) * randseed1));
+    uint32_t k2 = __ac_Wang_hash(samplehash2 ^ ((rpos + 1) * randseed2));
+    double altfrac =         allelefrac * pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
+    double reffrac = (1.0 - allelefrac) * pow((double)(k2 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
+    return altfrac/ (reffrac + altfrac);
 }
 
 struct _RevComplement {
@@ -151,10 +171,16 @@ void help(int argc, char **argv) {
     fprintf(stderr, "Optional parameters:\n");
     fprintf(stderr, " -f Fraction of variant allele (FA) to simulate. "
             "This value is overriden by the FA tag (specified by the -F command-line parameter) in the INPUT-VCF [default to %f].\n", DEFAULT_ALLELE_FRAC);
+    fprintf(stderr, " -p The power-law exponent simulating the over-dispersion of allele fractions in NGS [default to %f] (https://doi.org/10.1093/bib/bbab458). Negative value means that no over-dispersion is simulated. \n", DEFAULT_POWER_LAW_EXPONENT);
+    fprintf(stderr, " -s The random seed used to simulate allele fractions from read names labeled with UMIs [default to %u].\n", DEFAULT_RANDSEED);
+
+    
     fprintf(stderr, " -x Phred-scale sequencing error rates of simulated SNV variants "
             "where -2 means zero error and -1 means using sequencer BQ [default to %d].\n", DEFAULT_SNV_BQ_PHRED);
     fprintf(stderr, " -i The base quality of the inserted bases in the simulated insertion variants. "
             "[default to %d].\n", DEFAULT_INS_BQ_PHRED);
+    fprintf(stderr, " -A The random seed used to simulate the nominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_RANDSEED1);
+    fprintf(stderr, " -A The random seed used to simulate the denominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_RANDSEED2);
     fprintf(stderr, " -F allele fraction TAG in the VCF file. " "[default to FA].\n");
     fprintf(stderr, " -S sample name used for the -F command-line parameter. "
                     "The special values NULL pointer, empty-string, and INFO mean using the INFO column instead of the FORMAT column." "[default to NULL pointer].\n");
@@ -180,19 +206,24 @@ main(int argc, char **argv) {
     double defallelefrac = DEFAULT_ALLELE_FRAC;
     int snv_bq_phred = DEFAULT_SNV_BQ_PHRED;
     int ins_bq_phred = DEFAULT_INS_BQ_PHRED;
-    uint32_t randseed = 13;
+    uint32_t randseed = DEFAULT_RANDSEED;
+    uint32_t randseed1 = DEFAULT_RANDSEED1;
+    uint32_t randseed2 = DEFAULT_RANDSEED2;
     const char *tagFA = TAG_FA;
     const char *tagsample = NULL;
-    
-    while ((opt = getopt(argc, argv, "b:v:1:2:f:i:s:x:F:S:")) != -1) {
+    double powerlaw_exponent = DEFAULT_POWER_LAW_EXPONENT;
+    while ((opt = getopt(argc, argv, "b:v:1:2:f:i:p:s:x:A:B:F:S:")) != -1) {
         switch (opt) {
             case 'b': inbam = optarg; break;
             case 's': randseed = atoi(optarg); break;
+            case 'A': randseed1 = atoi(optarg); break;
+            case 'B': randseed2 = atoi(optarg); break;
             case 'v': invcf = optarg; break;
             case '1': r1outfq = optarg; break;
             case '2': r2outfq = optarg; break;
             case 'f': defallelefrac = atof(optarg); break;
             case 'i': ins_bq_phred = atof(optarg); break;
+            case 'p': powerlaw_exponent = atof(optarg); break;
             case 'x': snv_bq_phred = atof(optarg); break;
             case 'F': tagFA = optarg; break;
             case 'S': tagsample = optarg; break;
@@ -205,6 +236,18 @@ main(int argc, char **argv) {
     if (0 != randseed) {
         portable_srand(randseed);
         randseed = (uint32_t)portable_rand();
+    }
+    if (0 != randseed1) {
+        portable_srand(randseed1);
+        for (int i = 0; i < 2; i++) {
+            randseed1 = (uint32_t)portable_rand();
+        }
+    }
+    if (0 != randseed2) {
+        portable_srand(randseed2);
+        for (int i = 0; i < 3; i++) {
+            randseed2 = (uint32_t)portable_rand();
+        }
     }
     const bool is_FA_from_INFO = ((tagsample == NULL) || (0 == strlen(tagsample)) || !strcmp("INFO", tagsample));
     fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
@@ -241,6 +284,20 @@ main(int argc, char **argv) {
     int vcf_read_ret = 0;
     
     std::string newseq, newqual;
+    
+    samFile *bam_fp2 = sam_open(inbam, "r");
+    uint64_t samplehash1 = 0;
+    uint64_t samplehash2 = 0;
+    uint64_t read_cnt = 0;
+    while (sam_read1(bam_fp2, bam_hdr, bam_rec1) >= 0 && read_cnt <= 1000) {
+        for (int i = 0; i < bam_rec1->core.l_qseq; i++) {
+            const char nuc = seq_nt16_str[bam_seqi(bam_get_seq(bam_rec1), i)];
+            samplehash1 = samplehash1 * 31 + nuc;
+            samplehash2 = samplehash2 * 61 + nuc;
+        }
+        read_cnt += 1;
+    }
+    
     while (sam_read1(bam_fp, bam_hdr, bam_rec1) >= 0) {
         const bam1_t *bam_rec = bam_rec1;
         if (0 != (bam_rec->core.flag & 0x900)) { continue; }
@@ -323,7 +380,19 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                 valsize = bcf_get_format_float(vcf_hdr, vcf_rec, tagFA, &bcffloats, &ndst_val);
                                 allelefrac += ((valsize > 0 && valsize == bcf_hdr_nsamples(vcf_hdr)) ? bcffloats[tag_sample_idx] : defallelefrac);
                             }
-                            if (mutprob <= allelefrac) {
+                            
+                            double allelefrac2 = allelefrac;
+                            if (powerlaw_exponent > 0) {
+                                allelefrac2 = allelefrac_powlaw_transform(
+                                    allelefrac,
+                                    (uint64_t)rpos, 
+                                    samplehash1, 
+                                    samplehash2,
+                                    randseed1,
+                                    randseed2,
+                                    powerlaw_exponent);
+                            }
+                            if (mutprob <= allelefrac2) {
                                 const char *newref = vcf_rec->d.allele[0];
                                 const char *newalt = vcf_rec->d.allele[1];
                                 if (1 == strlen(newref) && 1 == strlen(newalt)) {
