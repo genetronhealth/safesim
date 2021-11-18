@@ -419,7 +419,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     num_kept_mnv++;
                                 } else if (strlen(newref) == 1 && strlen(newalt) >  1) {
                                     for (int k = 0; k < strlen(newalt); k++) { 
-                                        newseq.push_back(newalt[k]); 
+                                        newseq.push_back(newalt[k]);
                                     }
                                     newqual.push_back(qual[qpos]);
                                     for (int k = 1; k < strlen(newalt); k++) { 
@@ -430,6 +430,9 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); }
                                 } else if (strlen(newref) >  1 && strlen(newalt) == 1) {
                                     if (strlen(newref) + j < cigar_oplen1) {
+                                        const char nuc = seq_nt16_str[bam_seqi(seq, qpos)];
+                                        newseq.push_back(nuc);
+                                        newqual.push_back(qual[qpos]);
                                         j += strlen(newref) - 1;
                                         qpos += strlen(newref) - 1;
                                         rpos += strlen(newref) - 1;
