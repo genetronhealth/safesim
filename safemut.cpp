@@ -70,9 +70,9 @@ double qnameqpos2prob(const char *qname, int qpos, uint32_t &hash, uint32_t rand
 double 
 allelefrac_powlaw_transform(
         double allelefrac,
-        uint64_t rpos,
-        uint64_t samplehash1,
-        uint64_t samplehash2,
+        uint32_t rpos,
+        uint32_t samplehash1,
+        uint32_t samplehash2,
         uint32_t randseed1,
         uint32_t randseed2,
         double exponent) {
@@ -180,7 +180,7 @@ void help(int argc, char **argv) {
     fprintf(stderr, " -i The base quality of the inserted bases in the simulated insertion variants. "
             "[default to %d].\n", DEFAULT_INS_BQ_PHRED);
     fprintf(stderr, " -A The random seed used to simulate the nominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_RANDSEED1);
-    fprintf(stderr, " -A The random seed used to simulate the denominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_RANDSEED2);
+    fprintf(stderr, " -B The random seed used to simulate the denominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_RANDSEED2);
     fprintf(stderr, " -F allele fraction TAG in the VCF file. " "[default to FA].\n");
     fprintf(stderr, " -S sample name used for the -F command-line parameter. "
                     "The special values NULL pointer, empty-string, and INFO mean using the INFO column instead of the FORMAT column." "[default to NULL pointer].\n");
@@ -301,8 +301,7 @@ main(int argc, char **argv) {
     while (sam_read1(bam_fp, bam_hdr, bam_rec1) >= 0) {
         const bam1_t *bam_rec = bam_rec1;
         if (0 != (bam_rec->core.flag & 0x900)) { continue; }
-        while (is_var1_before_var2(vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_rec->core.pos)) {
-
+        while (1) {
             if (vcf_read_ret != -1) {
                 fprintf(stderr, "The variant at tid %d pos %d is before the read at tid %d pos %d, readname = %s\n", 
                     vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_rec->core.pos, bam_get_qname(bam_rec));
@@ -311,7 +310,10 @@ main(int argc, char **argv) {
                     vcf_rec->rid, vcf_rec->pos);
             }
             if (vcf_read_ret < 0) { break; }
-            
+            if (!is_var1_before_var2(vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_rec->core.pos)) {
+                vcf_list.push_back(bcf_dup(vcf_rec));  
+                break;
+            }
         }
         while (is_var1_before_var2(vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_endpos(bam_rec))) {
             if (vcf_read_ret != -1) {
@@ -385,11 +387,11 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                             if (powerlaw_exponent > 0) {
                                 allelefrac2 = allelefrac_powlaw_transform(
                                     allelefrac,
-                                    (uint64_t)rpos, 
-                                    samplehash1, 
-                                    samplehash2,
-                                    randseed1,
-                                    randseed2,
+                                    (uint32_t)(rpos + umihash), 
+                                    (uint32_t)samplehash1, 
+                                    (uint32_t)samplehash2,
+                                    (uint32_t)randseed1,
+                                    (uint32_t)randseed2,
                                     powerlaw_exponent);
                             }
                             if (mutprob <= allelefrac2) {
