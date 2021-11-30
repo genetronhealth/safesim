@@ -32,6 +32,7 @@ const char *GIT_DIFF_FULL =
 ;
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
 
 const double DEFAULT_ALLELE_FRAC = 0.1;
 const int DEFAULT_SNV_BQ_PHRED = -1;
