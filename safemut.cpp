@@ -39,8 +39,8 @@ const int DEFAULT_INS_BQ_PHRED = 30;
 const double DEFAULT_POWER_LAW_EXPONENT = 3.0;
 
 const uint32_t DEFAULT_RANDSEED = 13;
-const uint32_t DEFAULT_RANDSEED1 = 31;
-const uint32_t DEFAULT_RANDSEED2 = 61;
+const uint32_t DEFAULT_NITERS1 = 50;
+const uint32_t DEFAULT_NITERS2 = 500;
 
 const char *ACGT = "ACGT";
 const char *TAG_FA = "FA";
@@ -98,11 +98,11 @@ allelefrac_powlaw_transform(
         uint32_t rpos,
         uint32_t samplehash1,
         uint32_t samplehash2,
-        //uint32_t randseed1,
-        //uint32_t randseed2,
+        //uint32_t rand_niters1,
+        //uint32_t rand_niters2,
         double exponent) {
-    // uint32_t k1 = __ac_Wang_hash(samplehash1 ^ __ac_Wang_hash((rpos + 1) * randseed1));
-    // uint32_t k2 = __ac_Wang_hash(samplehash2 ^ __ac_Wang_hash((rpos + 1) * randseed2));
+    // uint32_t k1 = __ac_Wang_hash(samplehash1 ^ __ac_Wang_hash((rpos + 1) * rand_niters1));
+    // uint32_t k2 = __ac_Wang_hash(samplehash2 ^ __ac_Wang_hash((rpos + 1) * rand_niters2));
     std::vector<uint32_t> ks1;
     ks1.push_back(samplehash1);
     ks1.push_back(tid);
@@ -214,8 +214,8 @@ void help(int argc, char **argv) {
             "where -2 means zero error and -1 means using sequencer BQ [default to %d].\n", DEFAULT_SNV_BQ_PHRED);
     fprintf(stderr, " -i The base quality of the inserted bases in the simulated insertion variants. "
             "[default to %d].\n", DEFAULT_INS_BQ_PHRED);
-    fprintf(stderr, " -A The random seed used to simulate the nominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_RANDSEED1);
-    fprintf(stderr, " -B The random seed used to simulate the denominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_RANDSEED2);
+    fprintf(stderr, " -A The number of reads used to generate the randomness for simulating the nominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_NITERS1);
+    fprintf(stderr, " -B The number of reads used to generate the randomness for simulating the denominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_NITERS2);
     fprintf(stderr, " -C The random seed used to simulate basecalling error [default to %u].\n", DEFAULT_RANDSEED);
     fprintf(stderr, " -F allele fraction TAG in the VCF file. " "[default to FA].\n");
     fprintf(stderr, " -S sample name used for the -F command-line parameter. "
@@ -243,8 +243,8 @@ main(int argc, char **argv) {
     int snv_bq_phred = DEFAULT_SNV_BQ_PHRED;
     int ins_bq_phred = DEFAULT_INS_BQ_PHRED;
     uint32_t randseed = DEFAULT_RANDSEED;
-    uint32_t randseed1 = DEFAULT_RANDSEED1;
-    uint32_t randseed2 = DEFAULT_RANDSEED2;
+    uint32_t rand_niters1 = DEFAULT_NITERS1;
+    uint32_t rand_niters2 = DEFAULT_NITERS2;
     uint32_t randseed_basecall = DEFAULT_RANDSEED;
     const char *tagFA = TAG_FA;
     const char *tagsample = NULL;
@@ -253,8 +253,8 @@ main(int argc, char **argv) {
         switch (opt) {
             case 'b': inbam = optarg; break;
             case 's': randseed = atoi(optarg); break;
-            case 'A': randseed1 = atoi(optarg); break;
-            case 'B': randseed2 = atoi(optarg); break;
+            case 'A': rand_niters1 = atoi(optarg); break;
+            case 'B': rand_niters2 = atoi(optarg); break;
             case 'C': randseed_basecall = atoi(optarg); break;
             case 'v': invcf = optarg; break;
             case '1': r1outfq = optarg; break;
@@ -273,12 +273,6 @@ main(int argc, char **argv) {
     }
     if (0 != randseed) {
         randseed  = portable_int2randint(randseed , 1);
-    }
-    if (0 != randseed1) {
-        randseed1 = portable_int2randint(randseed1, 2);
-    }
-    if (0 != randseed2) {
-        randseed2 = portable_int2randint(randseed2, 3);
     }
     if (0 != randseed_basecall) {
         randseed_basecall = portable_int2randint(randseed_basecall, 4);
@@ -319,33 +313,21 @@ main(int argc, char **argv) {
     
     std::string newseq, newqual;
     
-    std::vector<uint32_t> vals1;
-    std::vector<uint32_t> vals2;
-    vals1.push_back(randseed1);
-    vals2.push_back(randseed2);
-    
     samFile *bam_fp2 = sam_open(inbam, "r");
     sam_hdr_t *bam_hdr2 = sam_hdr_read(bam_fp2);
     uint64_t read_cnt = 0;
-    while (sam_read1(bam_fp2, bam_hdr, bam_rec1) >= 0 && read_cnt < 1000) {
-        for (int i = 0; i < bam_rec1->core.l_qseq; i++) {
-            const char nuc = seq_nt16_str[bam_seqi(bam_get_seq(bam_rec1), i)];
-            const char bq = bam_get_qual(bam_rec1)[1];
-            if ((i % 2) == 0) {
-                vals1.push_back(nuc);
-                vals1.push_back(bq);
-            } else {
-                vals2.push_back(nuc);
-                vals2.push_back(bq);
-            }
+    uint32_t samplehash1 = 0;
+    uint32_t samplehash2 = 0;
+    while (sam_read1(bam_fp2, bam_hdr, bam_rec1) >= 0 && read_cnt < MAX(rand_niters1, rand_niters2)) {
+        if (read_cnt < rand_niters1) { 
+            samplehash1 += __ac_X31_hash_string(bam_get_qname(bam_rec1));
+        }
+        if (read_cnt < rand_niters2) { 
+            samplehash2 += __ac_X31_hash_string(bam_get_qname(bam_rec1));
         }
         read_cnt += 1;
     }
-    uint32_t samplehash1 = hashes2hash(vals1);
-    uint32_t samplehash2 = hashes2hash(vals2);
-    
-    fprintf(stderr, "The value samplehash1 is %u, read_cnt = %u\n", samplehash1, read_cnt);
-    fprintf(stderr, "The value samplehash2 is %u\n", samplehash2);
+    fprintf(stderr, "The value samplehash1 and samplehash2 are %u and %u, read_cnt = %u\n", samplehash1, samplehash2, read_cnt);
     bam_hdr_destroy(bam_hdr2);
     sam_close(bam_fp2);
     
@@ -445,8 +427,8 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     (uint32_t)(rpos),
                                     (uint32_t)samplehash1,
                                     (uint32_t)samplehash2,
-                                    // (uint32_t)randseed1,
-                                    // (uint32_t)randseed2,
+                                    // (uint32_t)rand_niters1,
+                                    // (uint32_t)rand_niters2,
                                     powerlaw_exponent);
                             }
                             if (mutprob <= allelefrac2) {
