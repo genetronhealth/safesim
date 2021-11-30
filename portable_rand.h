@@ -12,5 +12,13 @@ static inline void portable_srand(unsigned int seed) {
     portable_next = seed;
 }
 
+static inline int portable_int2randint(uint32_t randseed, int n_iters) {
+    portable_srand(randseed);
+    for (int i = 0; i < n_iters; i++) {
+        randseed = (uint32_t)portable_rand();
+    }
+    return randseed;
+}
+
 #endif
 

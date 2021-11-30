@@ -272,30 +272,16 @@ main(int argc, char **argv) {
         help(argc, argv);
     }
     if (0 != randseed) {
-        portable_srand(randseed);
-        randseed =  (uint32_t)portable_rand();
-        randseed = __ac_Wang_hash(randseed);
+        randseed  = portable_int2randint(randseed , 1);
     }
     if (0 != randseed1) {
-        portable_srand(randseed1);
-        for (int i = 0; i < 2; i++) {
-            randseed1 = (uint32_t)portable_rand();
-        }
-        randseed1 = __ac_Wang_hash(randseed1);
+        randseed1 = portable_int2randint(randseed1, 2);
     }
     if (0 != randseed2) {
-        portable_srand(randseed2);
-        for (int i = 0; i < 3; i++) {
-            randseed2 = (uint32_t)portable_rand();
-        }
-        randseed2 = __ac_Wang_hash(randseed2);
+        randseed2 = portable_int2randint(randseed2, 3);
     }
     if (0 != randseed_basecall) {
-        portable_srand(randseed_basecall);
-        for (int i = 0; i < 4; i++) {
-            randseed_basecall = (uint32_t)portable_rand();
-        }
-        randseed_basecall = __ac_Wang_hash(randseed_basecall);
+        randseed_basecall = portable_int2randint(randseed_basecall, 4);
     }
     const bool is_FA_from_INFO = ((tagsample == NULL) || (0 == strlen(tagsample)) || !strcmp("INFO", tagsample));
     fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
