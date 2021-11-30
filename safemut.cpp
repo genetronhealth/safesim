@@ -7,6 +7,7 @@
 
 #include <deque>
 #include <string>
+#include <vector>
 
 #include <stdio.h>
 #include <math.h>
@@ -29,6 +30,8 @@ for each read in the sorted bam
 const char *GIT_DIFF_FULL =
 #include "gitdiff.txt"
 ;
+
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 const double DEFAULT_ALLELE_FRAC = 0.1;
 const int DEFAULT_SNV_BQ_PHRED = -1;
@@ -53,16 +56,37 @@ int prob2phred(double prob) {
     return -(int)round(10.0 / log(10.0) * log(prob));
 }
 
-double umistr2prob(const char *str, uint32_t &umihash, uint32_t randseed) {
+uint32_t hashes2hash(std::vector<uint32_t>  hashes) {
+    uint32_t ret = 0;
+    for (uint32_t hash : hashes) {
+        ret = __ac_Wang_hash(hash ^ ret);
+    }
+    return ret;
+}
+
+double umistr2prob(uint32_t &umihash, uint32_t randseed, uint32_t begpos, uint32_t endpos, const char *str) {
+    
     const char *umistr1 = strchr(str, '#');
     const char *umistr = (NULL == umistr1 ? str : umistr1);
-    uint32_t k = __ac_Wang_hash(__ac_X31_hash_string(umistr) ^ randseed);
+    
+    std::vector<uint32_t>  hashes;
+    hashes.reserve(4);
+    hashes.push_back(randseed);
+    hashes.push_back(begpos);
+    hashes.push_back(endpos);
+    hashes.push_back(__ac_X31_hash_string(umistr));
+    uint32_t k = hashes2hash(hashes);
     umihash = k;
     return (double)(k&0xffffff) / 0x1000000;
 }
 
-double qnameqpos2prob(const char *qname, int qpos, uint32_t &hash, uint32_t randseed) {
-    uint32_t k = __ac_Wang_hash(__ac_X31_hash_string(qname) ^ ((qpos + 1) * randseed));
+double qnameqpos2prob(uint32_t &hash, uint32_t randseed, const char *qname, int qpos) {
+    std::vector<uint32_t>  hashes;
+    hashes.reserve(3);
+    hashes.push_back(randseed);
+    hashes.push_back(__ac_X31_hash_string(qname));
+    hashes.push_back(qpos);
+    uint32_t k = hashes2hash(hashes);
     hash = k;
     return (double)(k&0xffffff) / 0x1000000;
 }
@@ -70,17 +94,28 @@ double qnameqpos2prob(const char *qname, int qpos, uint32_t &hash, uint32_t rand
 double 
 allelefrac_powlaw_transform(
         double allelefrac,
+        uint32_t tid,
         uint32_t rpos,
         uint32_t samplehash1,
         uint32_t samplehash2,
-        uint32_t randseed1,
-        uint32_t randseed2,
+        //uint32_t randseed1,
+        //uint32_t randseed2,
         double exponent) {
-    uint32_t k1 = __ac_Wang_hash(samplehash1 ^ ((rpos + 1) * randseed1));
-    uint32_t k2 = __ac_Wang_hash(samplehash2 ^ ((rpos + 1) * randseed2));
+    // uint32_t k1 = __ac_Wang_hash(samplehash1 ^ __ac_Wang_hash((rpos + 1) * randseed1));
+    // uint32_t k2 = __ac_Wang_hash(samplehash2 ^ __ac_Wang_hash((rpos + 1) * randseed2));
+    std::vector<uint32_t> ks1;
+    ks1.push_back(samplehash1);
+    ks1.push_back(tid);
+    ks1.push_back(rpos);
+    uint32_t k1 = hashes2hash(ks1);
+    std::vector<uint32_t> ks2;
+    ks2.push_back(samplehash2);
+    ks2.push_back(tid);
+    ks2.push_back(rpos);
+    uint32_t k2 = hashes2hash(ks2);
     double altfrac =         allelefrac * pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
     double reffrac = (1.0 - allelefrac) * pow((double)(k2 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
-    return altfrac/ (reffrac + altfrac);
+    return altfrac / (reffrac + altfrac);
 }
 
 struct _RevComplement {
@@ -181,6 +216,7 @@ void help(int argc, char **argv) {
             "[default to %d].\n", DEFAULT_INS_BQ_PHRED);
     fprintf(stderr, " -A The random seed used to simulate the nominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_RANDSEED1);
     fprintf(stderr, " -B The random seed used to simulate the denominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_RANDSEED2);
+    fprintf(stderr, " -C The random seed used to simulate basecalling error [default to %u].\n", DEFAULT_RANDSEED);
     fprintf(stderr, " -F allele fraction TAG in the VCF file. " "[default to FA].\n");
     fprintf(stderr, " -S sample name used for the -F command-line parameter. "
                     "The special values NULL pointer, empty-string, and INFO mean using the INFO column instead of the FORMAT column." "[default to NULL pointer].\n");
@@ -209,6 +245,7 @@ main(int argc, char **argv) {
     uint32_t randseed = DEFAULT_RANDSEED;
     uint32_t randseed1 = DEFAULT_RANDSEED1;
     uint32_t randseed2 = DEFAULT_RANDSEED2;
+    uint32_t randseed_basecall = DEFAULT_RANDSEED;
     const char *tagFA = TAG_FA;
     const char *tagsample = NULL;
     double powerlaw_exponent = DEFAULT_POWER_LAW_EXPONENT;
@@ -218,6 +255,7 @@ main(int argc, char **argv) {
             case 's': randseed = atoi(optarg); break;
             case 'A': randseed1 = atoi(optarg); break;
             case 'B': randseed2 = atoi(optarg); break;
+            case 'C': randseed_basecall = atoi(optarg); break;
             case 'v': invcf = optarg; break;
             case '1': r1outfq = optarg; break;
             case '2': r2outfq = optarg; break;
@@ -235,19 +273,29 @@ main(int argc, char **argv) {
     }
     if (0 != randseed) {
         portable_srand(randseed);
-        randseed = (uint32_t)portable_rand();
+        randseed =  (uint32_t)portable_rand();
+        randseed = __ac_Wang_hash(randseed);
     }
     if (0 != randseed1) {
         portable_srand(randseed1);
         for (int i = 0; i < 2; i++) {
             randseed1 = (uint32_t)portable_rand();
         }
+        randseed1 = __ac_Wang_hash(randseed1);
     }
     if (0 != randseed2) {
         portable_srand(randseed2);
         for (int i = 0; i < 3; i++) {
             randseed2 = (uint32_t)portable_rand();
         }
+        randseed2 = __ac_Wang_hash(randseed2);
+    }
+    if (0 != randseed_basecall) {
+        portable_srand(randseed_basecall);
+        for (int i = 0; i < 4; i++) {
+            randseed_basecall = (uint32_t)portable_rand();
+        }
+        randseed_basecall = __ac_Wang_hash(randseed_basecall);
     }
     const bool is_FA_from_INFO = ((tagsample == NULL) || (0 == strlen(tagsample)) || !strcmp("INFO", tagsample));
     fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
@@ -285,18 +333,35 @@ main(int argc, char **argv) {
     
     std::string newseq, newqual;
     
+    std::vector<uint32_t> vals1;
+    std::vector<uint32_t> vals2;
+    vals1.push_back(randseed1);
+    vals2.push_back(randseed2);
+    
     samFile *bam_fp2 = sam_open(inbam, "r");
-    uint64_t samplehash1 = 0;
-    uint64_t samplehash2 = 0;
+    sam_hdr_t *bam_hdr2 = sam_hdr_read(bam_fp2);
     uint64_t read_cnt = 0;
-    while (sam_read1(bam_fp2, bam_hdr, bam_rec1) >= 0 && read_cnt <= 1000) {
+    while (sam_read1(bam_fp2, bam_hdr, bam_rec1) >= 0 && read_cnt < 1000) {
         for (int i = 0; i < bam_rec1->core.l_qseq; i++) {
             const char nuc = seq_nt16_str[bam_seqi(bam_get_seq(bam_rec1), i)];
-            samplehash1 = samplehash1 * 31 + nuc;
-            samplehash2 = samplehash2 * 61 + nuc;
+            const char bq = bam_get_qual(bam_rec1)[1];
+            if ((i % 2) == 0) {
+                vals1.push_back(nuc);
+                vals1.push_back(bq);
+            } else {
+                vals2.push_back(nuc);
+                vals2.push_back(bq);
+            }
         }
         read_cnt += 1;
     }
+    uint32_t samplehash1 = hashes2hash(vals1);
+    uint32_t samplehash2 = hashes2hash(vals2);
+    
+    fprintf(stderr, "The value samplehash1 is %u, read_cnt = %u\n", samplehash1, read_cnt);
+    fprintf(stderr, "The value samplehash2 is %u\n", samplehash2);
+    bam_hdr_destroy(bam_hdr2);
+    sam_close(bam_fp2);
     
     while (sam_read1(bam_fp, bam_hdr, bam_rec1) >= 0) {
         const bam1_t *bam_rec = bam_rec1;
@@ -342,7 +407,10 @@ main(int argc, char **argv) {
         const auto *bam_aux_data = bam_aux_get(bam_rec, "MI"); // this tag is reserved (https://samtools.github.io/hts-specs/SAMtags.pdf)
         const char *umistr = ((bam_aux_data != NULL) ? bam_aux2Z(bam_aux_data) : bam_get_qname(bam_rec));
         
-        const double mutprob = umistr2prob(umistr, umihash, randseed);
+        // TODO: this assumes 100% duplex forming efficiency, which is not what happens in practice. 
+        // TODO: introduce another parameter to simulate the efficiency of duplex formation?
+        uint32_t begpos = MIN(bam_rec->core.pos, bam_rec->core.mpos);
+        const double mutprob = umistr2prob(umihash, randseed, begpos, begpos + abs(bam_rec->core.isize), umistr);
         if (vcf_list.size() > 0) {
             int qpos = 0;
             int rpos = bam_rec->core.pos;
@@ -387,11 +455,12 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                             if (powerlaw_exponent > 0) {
                                 allelefrac2 = allelefrac_powlaw_transform(
                                     allelefrac,
-                                    (uint32_t)(rpos + umihash), 
-                                    (uint32_t)samplehash1, 
+                                    (uint32_t)(vcf_rec->rid),
+                                    (uint32_t)(rpos),
+                                    (uint32_t)samplehash1,
                                     (uint32_t)samplehash2,
-                                    (uint32_t)randseed1,
-                                    (uint32_t)randseed2,
+                                    // (uint32_t)randseed1,
+                                    // (uint32_t)randseed2,
                                     powerlaw_exponent);
                             }
                             if (mutprob <= allelefrac2) {
@@ -399,7 +468,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                 const char *newalt = vcf_rec->d.allele[1];
                                 if (1 == strlen(newref) && 1 == strlen(newalt)) {
                                     uint32_t hash = 0;
-                                    double randprob = qnameqpos2prob(bam_get_qname(bam_rec), qpos, hash, randseed);
+                                    double randprob = qnameqpos2prob(hash, randseed_basecall, bam_get_qname(bam_rec), qpos);
                                     const char base = ((-2 == snv_bq_phred)
                                             || (prob2phred(randprob) < (-1 == snv_bq_phred ? qual[qpos] : snv_bq_phred)) 
                                             ? (newalt[0]) : (ACGT[hash % 4]));
@@ -412,7 +481,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     fprintf(stderr, "Warning: the MNV at tid %d pos %d is decomposed into SNV and only the first SNV is simulated\n", 
                                             bam_rec->core.tid, bam_rec->core.pos);
                                     uint32_t hash = 0;
-                                    double randprob = qnameqpos2prob(bam_get_qname(bam_rec), qpos, hash, randseed);
+                                    double randprob = qnameqpos2prob(hash, randseed_basecall, bam_get_qname(bam_rec), qpos);
                                     const char base = ((-2 == snv_bq_phred)
                                             || (prob2phred(randprob) < (-1 == snv_bq_phred ? qual[qpos] : snv_bq_phred)) 
                                             ? (newalt[0]) : (ACGT[hash % 4]));
