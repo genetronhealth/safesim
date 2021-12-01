@@ -37,7 +37,8 @@ const char *GIT_DIFF_FULL =
 const double DEFAULT_ALLELE_FRAC = 0.1;
 const int DEFAULT_SNV_BQ_PHRED = -1;
 const int DEFAULT_INS_BQ_PHRED = 30;
-const double DEFAULT_POWER_LAW_EXPONENT = 3.0;
+const double DEFAULT_POWER_LAW_EXPONENT = -1.0; // 3.0;
+const double DEFAULT_LOGNORMAL_DISP = 15.0;
 
 const uint32_t DEFAULT_RANDSEED = 13;
 const uint32_t DEFAULT_NITERS1 = 50;
@@ -116,6 +117,43 @@ allelefrac_powlaw_transform(
     uint32_t k2 = hashes2hash(ks2);
     double altfrac =         allelefrac * pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
     double reffrac = (1.0 - allelefrac) * pow((double)(k2 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
+    double odds_ratio = ((altfrac + 1e-9) / (refrac + 1e-9));
+    return odds_ratio / (1.0 + odds_ratio);
+}
+
+double 
+allelefrac_lognormal_transform(
+        double allelefrac,
+        uint32_t tid,
+        uint32_t rpos,
+        uint32_t samplehash1,
+        uint32_t samplehash2,
+        double lognormal_disp) {
+    std::vector<uint32_t> ks1;
+    ks1.push_back(samplehash1);
+    ks1.push_back(tid);
+    ks1.push_back(rpos);
+    uint32_t k1 = hashes2hash(ks1);
+    std::vector<uint32_t> ks2;
+    ks2.push_back(samplehash2);
+    ks2.push_back(tid);
+    ks2.push_back(rpos);
+    uint32_t k2 = hashes2hash(ks2);
+    // https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
+    double u1 = (double)(k1 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
+    double u2 = (double)(k2 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
+    auto mag = sigma * sqrt(-2.0 * log(u1));
+    auto z0  = mag * cos(two_pi * u2) + mu;
+    auto z1  = mag * sin(two_pi * u2) + mu;
+    // if norm-z-score(rv) is log(2), then its lognormal rv doubles
+    //   at rv=log(2), std-norm       density-val is exp(-1/2 * ((log(2) - 0) / 1)**2)
+    //   at rv=log(2), norm(0, stdev) density-val is exp(-1/2 * ((log(2) / stdev - 0) / 1)**2), which is frac
+    //   frac = exp(-1/2 * ((log(2)- 0) / stdev)**2)
+    //   stdev = sqrt(log(frac) / (-1/2)) / log(2)
+    double frac = pow(10.0, -lognormal_disp / 10.0);
+    double sigma = log(2.0) / sqrt(log(frac) / (-1.0/2.0));
+    double altfrac = (      allelefrac) * exp(pow(z0 * sigma, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
+    double reffrac = (1.0 - allelefrac) * exp(pow(z1 * sigma, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
     return altfrac / (reffrac + altfrac);
 }
 
@@ -208,6 +246,7 @@ void help(int argc, char **argv) {
     fprintf(stderr, " -f Fraction of variant allele (FA) to simulate. "
             "This value is overriden by the FA tag (specified by the -F command-line parameter) in the INPUT-VCF [default to %f].\n", DEFAULT_ALLELE_FRAC);
     fprintf(stderr, " -p The power-law exponent simulating the over-dispersion of allele fractions in NGS [default to %f] (https://doi.org/10.1093/bib/bbab458). Negative value means that no over-dispersion is simulated. \n", DEFAULT_POWER_LAW_EXPONENT);
+    fprintf(stderr, " -q the log-normal over-dispersion parameter in Phred scale [default to %f] (https://doi.org/10.1093/bib/bbab458). Negative value means that no over-dispersion is simulated. \n", DEFAULT_LOGNORMAL_DISP);
     fprintf(stderr, " -s The random seed used to simulate allele fractions from read names labeled with UMIs [default to %u].\n", DEFAULT_RANDSEED);
 
     
@@ -250,6 +289,7 @@ main(int argc, char **argv) {
     const char *tagFA = TAG_FA;
     const char *tagsample = NULL;
     double powerlaw_exponent = DEFAULT_POWER_LAW_EXPONENT;
+    double lognormal_disp = DEFAULT_LOGNORMAL_DISP;
     while ((opt = getopt(argc, argv, "b:v:1:2:f:i:p:s:x:A:B:F:S:")) != -1) {
         switch (opt) {
             case 'b': inbam = optarg; break;
@@ -263,6 +303,7 @@ main(int argc, char **argv) {
             case 'f': defallelefrac = atof(optarg); break;
             case 'i': ins_bq_phred = atof(optarg); break;
             case 'p': powerlaw_exponent = atof(optarg); break;
+            case 'q': lognormal_disp = atof(optarg); break;
             case 'x': snv_bq_phred = atof(optarg); break;
             case 'F': tagFA = optarg; break;
             case 'S': tagsample = optarg; break;
@@ -430,6 +471,16 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     (uint32_t)samplehash2,
                                     // (uint32_t)rand_niters1,
                                     // (uint32_t)rand_niters2,
+                                    powerlaw_exponent);
+                            }
+                            double allelefrac3 = allelefrac2;
+                            if (lognormal_disp > 0) {
+                                allelefrac3 = allelefrac_lognormal_transform(
+                                    allelefrac2,
+                                    (uint32_t)(vcf_rec->rid),
+                                    (uint32_t)(rpos),
+                                    (uint32_t)samplehash1,
+                                    (uint32_t)samplehash2,
                                     powerlaw_exponent);
                             }
                             if (mutprob <= allelefrac2) {
