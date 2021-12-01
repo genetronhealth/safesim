@@ -117,7 +117,7 @@ allelefrac_powlaw_transform(
     uint32_t k2 = hashes2hash(ks2);
     double altfrac =         allelefrac * pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
     double reffrac = (1.0 - allelefrac) * pow((double)(k2 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
-    double odds_ratio = ((altfrac + 1e-9) / (refrac + 1e-9));
+    double odds_ratio = ((altfrac + 1e-9) / (reffrac + 1e-9));
     return odds_ratio / (1.0 + odds_ratio);
 }
 
@@ -139,12 +139,6 @@ allelefrac_lognormal_transform(
     ks2.push_back(tid);
     ks2.push_back(rpos);
     uint32_t k2 = hashes2hash(ks2);
-    // https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
-    double u1 = (double)(k1 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
-    double u2 = (double)(k2 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
-    auto mag = sigma * sqrt(-2.0 * log(u1));
-    auto z0  = mag * cos(two_pi * u2) + mu;
-    auto z1  = mag * sin(two_pi * u2) + mu;
     // if norm-z-score(rv) is log(2), then its lognormal rv doubles
     //   at rv=log(2), std-norm       density-val is exp(-1/2 * ((log(2) - 0) / 1)**2)
     //   at rv=log(2), norm(0, stdev) density-val is exp(-1/2 * ((log(2) / stdev - 0) / 1)**2), which is frac
@@ -152,8 +146,16 @@ allelefrac_lognormal_transform(
     //   stdev = sqrt(log(frac) / (-1/2)) / log(2)
     double frac = pow(10.0, -lognormal_disp / 10.0);
     double sigma = log(2.0) / sqrt(log(frac) / (-1.0/2.0));
-    double altfrac = (      allelefrac) * exp(pow(z0 * sigma, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
-    double reffrac = (1.0 - allelefrac) * exp(pow(z1 * sigma, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
+    // https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
+    const double two_pi = 3.14159265358979323846  * 2.0;
+    double mu = 0;
+    double u1 = (double)(k1 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
+    double u2 = (double)(k2 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
+    auto mag = sigma * sqrt(-2.0 * log(u1));
+    auto z0  = mag * cos(two_pi * u2) + mu;
+    auto z1  = mag * sin(two_pi * u2) + mu;
+    double altfrac = (      allelefrac) * exp(pow(z0, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
+    double reffrac = (1.0 - allelefrac) * exp(pow(z1, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
     return altfrac / (reffrac + altfrac);
 }
 
