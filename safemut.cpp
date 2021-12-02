@@ -128,7 +128,7 @@ allelefrac_lognormal_transform(
         uint32_t rpos,
         uint32_t samplehash1,
         uint32_t samplehash2,
-        double lognormal_disp) {
+        double lnsigma) {
     std::vector<uint32_t> ks1;
     ks1.push_back(samplehash1);
     ks1.push_back(tid);
@@ -144,14 +144,13 @@ allelefrac_lognormal_transform(
     //   at rv=log(2), norm(0, stdev) density-val is exp(-1/2 * ((log(2) / stdev - 0) / 1)**2), which is frac
     //   frac = exp(-1/2 * ((log(2)- 0) / stdev)**2)
     //   stdev = sqrt(log(frac) / (-1/2)) / log(2)
-    double frac = pow(10.0, -lognormal_disp / 10.0);
-    double sigma = log(2.0) / sqrt(log(frac) / (-1.0/2.0));
+    
     // https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
     const double two_pi = 3.14159265358979323846  * 2.0;
     double mu = 0;
     double u1 = (double)(k1 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
     double u2 = (double)(k2 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
-    auto mag = sigma * sqrt(-2.0 * log(u1));
+    auto mag = lnsigma * sqrt(-2.0 * log(u1));
     auto z0  = mag * cos(two_pi * u2) + mu;
     auto z1  = mag * sin(two_pi * u2) + mu;
     double altfrac = (      allelefrac) * exp(pow(z0, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
@@ -315,6 +314,9 @@ main(int argc, char **argv) {
     if (NULL == inbam || NULL == invcf || NULL == r1outfq || NULL == r2outfq) {
         help(argc, argv);
     }
+    double lnfrac = pow(10.0, -lognormal_disp / 10.0);
+    double lnsigma = log(2.0) / sqrt(log(lnfrac) / (-1.0/2.0));
+    
     if (0 != randseed) {
         randseed  = portable_int2randint(randseed , 1);
     }
@@ -323,6 +325,7 @@ main(int argc, char **argv) {
     }
     const bool is_FA_from_INFO = ((tagsample == NULL) || (0 == strlen(tagsample)) || !strcmp("INFO", tagsample));
     fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
+    fprintf(stderr, "lnsigma = %f\n", lnsigma);
     
     int64_t num_kept_reads = 0;
     int64_t num_kept_snv = 0;
@@ -483,9 +486,9 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     (uint32_t)(rpos),
                                     (uint32_t)samplehash1,
                                     (uint32_t)samplehash2,
-                                    powerlaw_exponent);
+                                    lnsigma);
                             }
-                            if (mutprob <= allelefrac2) {
+                            if (mutprob <= allelefrac3) {
                                 const char *newref = vcf_rec->d.allele[0];
                                 const char *newalt = vcf_rec->d.allele[1];
                                 if (1 == strlen(newref) && 1 == strlen(newalt)) {
@@ -497,8 +500,10 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     newseq.push_back(base);
                                     newqual.push_back(qual[qpos]);
                                     num_kept_snv++;
-                                    if (ispowerof2(num_kept_snv)) { fprintf(stderr, "The read with name %s is spiked with the snv-variant at tid %d pos %d\n", 
-                                            bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); }
+                                    if (ispowerof2(num_kept_snv)) { 
+                                        fprintf(stderr, "The read with name %s is spiked with the snv-variant at tid %d pos %d, FAs = %f,%f,%f\n", 
+                                                bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos, allelefrac, allelefrac2, allelefrac3);
+                                    }
                                 } else if (strlen(newref) == strlen(newalt)) {
                                     fprintf(stderr, "Warning: the MNV at tid %d pos %d is decomposed into SNV and only the first SNV is simulated\n", 
                                             bam_rec->core.tid, bam_rec->core.pos);
