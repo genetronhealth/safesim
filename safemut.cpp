@@ -292,7 +292,7 @@ main(int argc, char **argv) {
     const char *tagsample = NULL;
     double powerlaw_exponent = DEFAULT_POWER_LAW_EXPONENT;
     double lognormal_disp = DEFAULT_LOGNORMAL_DISP;
-    while ((opt = getopt(argc, argv, "b:v:1:2:f:i:p:s:x:A:B:F:S:")) != -1) {
+    while ((opt = getopt(argc, argv, "b:v:1:2:f:i:p:q:s:x:A:B:F:S:")) != -1) {
         switch (opt) {
             case 'b': inbam = optarg; break;
             case 's': randseed = atoi(optarg); break;
