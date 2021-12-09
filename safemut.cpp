@@ -121,6 +121,12 @@ allelefrac_powlaw_transform(
     return odds_ratio / (1.0 + odds_ratio);
 }
 
+int sgn(double x) {
+    if (0 == x) { return 0; }
+    if (x > 0) { return  1; }
+    if (x < 0) { return -1; }
+}
+
 double 
 allelefrac_lognormal_transform(
         double allelefrac,
@@ -146,16 +152,17 @@ allelefrac_lognormal_transform(
     //   stdev = sqrt(log(frac) / (-1/2)) / log(2)
     
     // https://en.wikipedia.org/wiki/Box%E2%80%93Muller_transform
-    const double two_pi = 3.14159265358979323846  * 2.0;
+    const double two_pi = 3.14159265358979323846 * 2.0;
     double mu = 0;
     double u1 = (double)(k1 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
     double u2 = (double)(k2 & 0xffffff) / (double)0x1000000 + (0.5 / (double)(0x1000000));
     auto mag = lnsigma * sqrt(-2.0 * log(u1));
     auto z0  = mag * cos(two_pi * u2) + mu;
     auto z1  = mag * sin(two_pi * u2) + mu;
-    double altfrac = (      allelefrac) * exp(pow(z0, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
-    double reffrac = (1.0 - allelefrac) * exp(pow(z1, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
-    return altfrac / (reffrac + altfrac);
+    // double altfrac = (      allelefrac) * exp((double)sgn(z0) * pow(z0, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
+    // double reffrac = (1.0 - allelefrac) * exp((double)sgn(z1) * pow(z1, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
+    double odds_ratio = (allelefrac + 1e-9) / (1.0 - allelefrac + 1e-9) * exp(z0); // ((altfrac + 1e-9) / (reffrac + 1e-9));
+    return odds_ratio / (1.0 + odds_ratio);
 }
 
 struct _RevComplement {
