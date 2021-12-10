@@ -323,6 +323,7 @@ main(int argc, char **argv) {
     }
     double lnfrac = pow(10.0, -lognormal_disp / 10.0);
     double lnsigma = log(2.0) / sqrt(log(lnfrac) / (-1.0/2.0));
+    lnsigma = lnsigma / sqrt(2.0); // transform obs-to-obs var to obs-to-exp var
     
     if (0 != randseed) {
         randseed  = portable_int2randint(randseed , 1);
