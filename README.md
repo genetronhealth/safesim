@@ -25,6 +25,7 @@ For UMI (unique molecular identifier, a.k.a. molecular barcode) to be detected, 
 For example, the UMI-labeled read name can be
  1. "H5G5ABBCC:4:1209:10114:63736#ACGTAACCA" (ACGTAACCA is the single-strand barcode) or 
  2. "H5G5ABBCC:1:3010:10412:33669#AGTA+TGGT" (AGTA+TGGT is the duplex barcode).
+Please note that INFO/FA must be defined the header of the input VCF file in order to be effective, otherwise the default value of allele fraction is used by the simulation. 
 
 # Other things
 

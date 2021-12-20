@@ -252,7 +252,9 @@ void help(int argc, char **argv) {
     fprintf(stderr, "Usage: %s -b <INPUT-BAM> -v <INPUT-VCF> -1 <OUTPUT-R1-FASTQ> -2 <OUTPUT-R1-FASTQ>\n", argv[0]);
     fprintf(stderr, "Optional parameters:\n");
     fprintf(stderr, " -f Fraction of variant allele (FA) to simulate. "
-            "This value is overriden by the FA tag (specified by the -F command-line parameter) in the INPUT-VCF [default to %f].\n", DEFAULT_ALLELE_FRAC);
+            "This value is overriden by the INFO/FA tag (specified by the -F command-line parameter) in the INPUT-VCF. "
+            "Please note that INFO/FA must be defined the header of INPUT-VCF to be effective. "
+            "Otherwise, the value defined by -f is used in the simulation [default to %f].\n", DEFAULT_ALLELE_FRAC);
     fprintf(stderr, " -p The power-law exponent simulating the over-dispersion of allele fractions in NGS [default to %f] (https://doi.org/10.1093/bib/bbab458). Negative value means that no over-dispersion is simulated. \n", DEFAULT_POWER_LAW_EXPONENT);
     fprintf(stderr, " -q the log-normal over-dispersion parameter in Phred scale [default to %f] (https://doi.org/10.1093/bib/bbab458). Negative value means that no over-dispersion is simulated. \n", DEFAULT_LOGNORMAL_DISP);
     fprintf(stderr, " -s The random seed used to simulate allele fractions from read names labeled with UMIs [default to %u].\n", DEFAULT_RANDSEED);
@@ -296,9 +298,10 @@ main(int argc, char **argv) {
     uint32_t randseed_basecall = DEFAULT_RANDSEED;
     const char *tagFA = TAG_FA;
     const char *tagsample = NULL;
+    bool is_always_log = false;
     double powerlaw_exponent = DEFAULT_POWER_LAW_EXPONENT;
     double lognormal_disp = DEFAULT_LOGNORMAL_DISP;
-    while ((opt = getopt(argc, argv, "b:v:1:2:f:i:p:q:s:x:A:B:F:S:")) != -1) {
+    while ((opt = getopt(argc, argv, "b:v:1:2:f:i:p:q:s:x:A:B:F:S:L")) != -1) {
         switch (opt) {
             case 'b': inbam = optarg; break;
             case 's': randseed = atoi(optarg); break;
@@ -314,6 +317,7 @@ main(int argc, char **argv) {
             case 'q': lognormal_disp = atof(optarg); break;
             case 'x': snv_bq_phred = atof(optarg); break;
             case 'F': tagFA = optarg; break;
+            case 'L': is_always_log = true; break;
             case 'S': tagsample = optarg; break;
             default: help(argc, argv);
         }
@@ -508,7 +512,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     newseq.push_back(base);
                                     newqual.push_back(qual[qpos]);
                                     num_kept_snv++;
-                                    if (ispowerof2(num_kept_snv)) { 
+                                    if (ispowerof2(num_kept_snv) || is_always_log) { 
                                         fprintf(stderr, "The read with name %s is spiked with the snv-variant at tid %d pos %d, FAs = %f,%f,%f\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos, allelefrac, allelefrac2, allelefrac3);
                                     }
@@ -532,7 +536,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                         newqual.push_back((char)(ins_bq_phred)); 
                                     }
                                     num_kept_ins++;
-                                    if (ispowerof2(num_kept_ins)) { fprintf(stderr, "The read with name %s is spiked with the ins-variant at tid %d pos %d\n", 
+                                    if (ispowerof2(num_kept_ins) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the ins-variant at tid %d pos %d\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); }
                                 } else if (strlen(newref) >  1 && strlen(newalt) == 1) {
                                     if (strlen(newref) + j < cigar_oplen1) {
@@ -543,7 +547,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                         qpos += strlen(newref) - 1;
                                         rpos += strlen(newref) - 1;
                                         num_kept_del++;
-                                        if (ispowerof2(num_kept_del)) { fprintf(stderr, "The read with name %s is spiked with the del-variant at tid %d pos %d\n", 
+                                        if (ispowerof2(num_kept_del) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the del-variant at tid %d pos %d\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); }
                                     } else {
                                         newseq.push_back(seq_nt16_str[bam_seqi(seq, qpos)]);
@@ -556,7 +560,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                 is_mutated = true;
                                 break;
                             } else {
-                                if (ispowerof2(num_skip_reads)) {
+                                if (ispowerof2(num_skip_reads) || is_always_log) {
                                     fprintf(stderr, "The read with name %s is not affected by the variant at tid %d pos %d\n", 
                                     bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); 
                                 }
