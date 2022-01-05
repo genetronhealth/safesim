@@ -1,4 +1,5 @@
 #include "portable_rand.h"
+#include "version.h"
 
 #include "htslib/khash.h"
 #include "htslib/sam.h"
@@ -100,11 +101,7 @@ allelefrac_powlaw_transform(
         uint32_t rpos,
         uint32_t samplehash1,
         uint32_t samplehash2,
-        //uint32_t rand_niters1,
-        //uint32_t rand_niters2,
         double exponent) {
-    // uint32_t k1 = __ac_Wang_hash(samplehash1 ^ __ac_Wang_hash((rpos + 1) * rand_niters1));
-    // uint32_t k2 = __ac_Wang_hash(samplehash2 ^ __ac_Wang_hash((rpos + 1) * rand_niters2));
     std::vector<uint32_t> ks1;
     ks1.push_back(samplehash1);
     ks1.push_back(tid);
@@ -159,8 +156,6 @@ allelefrac_lognormal_transform(
     auto mag = lnsigma * sqrt(-2.0 * log(u1));
     auto z0  = mag * cos(two_pi * u2) + mu;
     auto z1  = mag * sin(two_pi * u2) + mu;
-    // double altfrac = (      allelefrac) * exp((double)sgn(z0) * pow(z0, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
-    // double reffrac = (1.0 - allelefrac) * exp((double)sgn(z1) * pow(z1, 2.0)); // pow((double)(k1 & 0xffffff) / (double)0x1000000, 1.0 / exponent);
     double odds_ratio = (allelefrac + 1e-9) / (1.0 - allelefrac + 1e-9) * exp(z0); // ((altfrac + 1e-9) / (reffrac + 1e-9));
     return odds_ratio / (1.0 + odds_ratio);
 }
@@ -246,7 +241,7 @@ int bamrec_write_fastq(const bam1_t *aln, std::string &seq, std::string &qual, g
 }
 
 void help(int argc, char **argv) {
-    fprintf(stderr, "Program %s version %s (%s)\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH);
+    fprintf(stderr, "Program %s version %s (%s)\n", argv[0], FULL_VERSION, COMMIT_DIFF_SH);
     fprintf(stderr, "  This is a NGS variant simulator that is aware of the molecular-barcodes (also known as unique molecular identifiers (UMIs))\n");
     
     fprintf(stderr, "Usage: %s -b <INPUT-BAM> -v <INPUT-VCF> -1 <OUTPUT-R1-FASTQ> -2 <OUTPUT-R1-FASTQ>\n", argv[0]);
@@ -336,7 +331,7 @@ main(int argc, char **argv) {
         randseed_basecall = portable_int2randint(randseed_basecall, 4);
     }
     const bool is_FA_from_INFO = ((tagsample == NULL) || (0 == strlen(tagsample)) || !strcmp("INFO", tagsample));
-    fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
+    fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], FULL_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
     fprintf(stderr, "lnsigma = %f\n", lnsigma);
     
     int64_t num_kept_reads = 0;
@@ -461,8 +456,6 @@ main(int argc, char **argv) {
                                 vcf_rec_it_end++;
                                 vcf_list_idx_end++;
                             }
-                            // const auto & vcf_rec = vcf_list[vcf_list_idx + (((int)umihash) % (1 + vcf_list_idx_end - vcf_list_idx))];
-                            // const auto & vcf_rec = *vcf_rec_it;
                             double allelefrac = (double)0;
                             bool is_mutated = false;
 for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++) {
@@ -486,8 +479,6 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     (uint32_t)(rpos),
                                     (uint32_t)samplehash1,
                                     (uint32_t)samplehash2,
-                                    // (uint32_t)rand_niters1,
-                                    // (uint32_t)rand_niters2,
                                     powerlaw_exponent);
                             }
                             double allelefrac3 = allelefrac2;
@@ -593,7 +584,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                 } else if (cigar_op == BAM_CDEL) {
                     rpos += cigar_oplen;
                 } else if (cigar_op == BAM_CHARD_CLIP) {
-                    // qpos += cigar_oplen;
+                    // fall through
                 } else {
                     fprintf(stderr, "The cigar code %d is invalid at tid %d pos %d for read %s!\n", 
                             cigar_op, bam_rec->core.tid, bam_rec->core.pos, bam_get_qname(bam_rec));

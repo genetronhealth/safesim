@@ -1,4 +1,5 @@
 #include "portable_rand.h"
+#include "version.h"
 
 #include "htslib/khash.h"
 #include "htslib/sam.h"
@@ -52,7 +53,7 @@ typedef struct {
 const arg_default_vals_t arg_default_vals;
 
 void help(int argc, char **argv) {
-    fprintf(stderr, "Program %s version %s (%s)\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH);
+    fprintf(stderr, "Program %s version %s (%s)\n", argv[0], FULL_VERSION, COMMIT_DIFF_SH);
     fprintf(stderr, "  This program mixes two bam files and is aware of the molecular-barcodes (also known as unique molecular identifiers (UMIs))\n");
     
     fprintf(stderr, "Usage: %s -o <OUTPUT-PREFIX> -a <tumor-INPUT-BAM> -b <normal-INPUT-BAM>\n", argv[0]);
@@ -126,7 +127,7 @@ main(int argc, char **argv) {
     double tiqfrac = niq / tiq;
     double tosdfrac = nosd / tosd;
     
-    fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], COMMIT_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
+    fprintf(stderr, "%s\n=== version ===\n%s\n%s\n%s\n", argv[0], FULL_VERSION, COMMIT_DIFF_SH, GIT_DIFF_FULL);
     
     subsample_info_t t_subsample_info = { tbam, defallelefrac,           tiqfrac,     tosdfrac };
     subsample_info_t n_subsample_info = { nbam, 1.0 - defallelefrac, 1.0/tiqfrac, 1.0/tosdfrac };
