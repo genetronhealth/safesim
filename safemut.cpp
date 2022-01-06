@@ -200,8 +200,7 @@ int is_var1_before_var2(int tid1, int pos1, int tid2, int pos2) {
     return (tid1 < tid2) || (tid1 == tid2 && pos1 < pos2);
 }
 
-int bamrec_write_fastq_raw(const bam1_t *aln, gzFile &r1file, gzFile &r2file) {
-    auto &outfile = ((aln->core.flag & 0x40) ? r1file : ((aln->core.flag & 0x80) ? r2file : r1file));
+int bamrec_write_fastq_raw(const bam1_t *aln, gzFile &outfile) {
     std::string seq;
     std::string qual;
     
@@ -223,8 +222,7 @@ int bamrec_write_fastq_raw(const bam1_t *aln, gzFile &r1file, gzFile &r2file) {
 }
 
 
-int bamrec_write_fastq(const bam1_t *aln, std::string &seq, std::string &qual, gzFile &r1file, gzFile &r2file) {
-    auto &outfile = ((aln->core.flag & 0x40) ? r1file : ((aln->core.flag & 0x80) ? r2file : r1file));
+int bamrec_write_fastq(const bam1_t *aln, std::string &seq, std::string &qual, gzFile &outfile) {
     
     assert(qual.size() == seq.size());
     for (int i = 0; i < qual.size(); i++) {
@@ -282,6 +280,7 @@ main(int argc, char **argv) {
     int flags, opt;
     char *inbam = NULL;
     char *invcf = NULL;
+    char *r0outfq = NULL;
     char *r1outfq = NULL;
     char *r2outfq = NULL;
     double defallelefrac = DEFAULT_ALLELE_FRAC;
@@ -304,6 +303,7 @@ main(int argc, char **argv) {
             case 'B': rand_niters2 = atoi(optarg); break;
             case 'C': randseed_basecall = atoi(optarg); break;
             case 'v': invcf = optarg; break;
+            case '0': r0outfq = optarg; break;
             case '1': r1outfq = optarg; break;
             case '2': r2outfq = optarg; break;
             case 'f': defallelefrac = atof(optarg); break;
@@ -317,7 +317,12 @@ main(int argc, char **argv) {
             default: help(argc, argv);
         }
     }
-    if (NULL == inbam || NULL == invcf || NULL == r1outfq || NULL == r2outfq) {
+    if (NULL == inbam || NULL == invcf) {
+        fprintf(stderr, "The input BAM and VCF filenames have to be specified on the command line\n");
+        help(argc, argv);
+    }
+    if ((NULL == r0outfq) && (NULL == r1outfq) && (NULL == r2outfq)) {
+        fprintf(stderr, "At least one output FASTQ file has to be specified on the command line\n");
         help(argc, argv);
     }
     double lnfrac = pow(10.0, -lognormal_disp / 10.0);
@@ -357,6 +362,7 @@ main(int argc, char **argv) {
     sam_hdr_t *bam_hdr = sam_hdr_read(bam_fp);
     bam1_t *bam_rec1 = bam_init1();
     
+    gzFile r0file = gzopen(r0outfq, "wb1");
     gzFile r1file = gzopen(r1outfq, "wb1");
     gzFile r2file = gzopen(r2outfq, "wb1");
     
@@ -388,6 +394,9 @@ main(int argc, char **argv) {
     while (sam_read1(bam_fp, bam_hdr, bam_rec1) >= 0) {
         const bam1_t *bam_rec = bam_rec1;
         if (0 != (bam_rec->core.flag & 0x900)) { continue; }
+        auto &outfile = ((bam_rec->core.flag & 0x40) ? r1file : ((bam_rec->core.flag & 0x80) ? r2file : r0file));
+        const char *outfname = ((bam_rec->core.flag & 0x40) ? r1outfq : ((bam_rec->core.flag & 0x80) ? r2outfq : r0outfq));
+        
         while (1) {
             if (vcf_read_ret != -1) {
                 fprintf(stderr, "The variant at tid %d pos %d is before the read at tid %d pos %d, readname = %s\n", 
@@ -591,15 +600,15 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                     abort();
                 }
             }
-            bamrec_write_fastq(bam_rec, newseq, newqual, r1file, r2file);
+            if (outfname != NULL) { bamrec_write_fastq(bam_rec, newseq, newqual, outfile); }
         } else {
-            bamrec_write_fastq_raw(bam_rec, r1file, r2file);    
+            if (outfname != NULL) { bamrec_write_fastq_raw(bam_rec, outfile); } 
         }
     }
     if (bcffloats != NULL) {
         free(bcffloats);
     }
-
+    
     bam_destroy1(bam_rec1);
     bam_hdr_destroy(bam_hdr);
     sam_close(bam_fp);
@@ -608,9 +617,10 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
     bcf_hdr_destroy(vcf_hdr);
     vcf_close(vcf_fp);
     
+    gzclose(r0file);
     gzclose(r1file);
     gzclose(r2file);
-
+    
     fprintf(stderr, "In total: kept %ld read support, skipped %ld read support"
             ", and skipped %ld no-variant CMATCH cigars.\n", num_kept_reads, num_skip_reads, num_skip_cmatches);
     fprintf(stderr, "Kept %d snv read support\n", num_kept_snv);
