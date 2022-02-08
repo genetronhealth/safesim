@@ -73,11 +73,24 @@ double umistr2prob(uint32_t &umihash, uint32_t randseed, uint32_t begpos, uint32
     const char *umistr = (NULL == umistr1 ? str : umistr1);
     
     std::vector<uint32_t>  hashes;
-    hashes.reserve(4);
+    hashes.reserve(4 + 1);
     hashes.push_back(randseed);
     hashes.push_back(begpos);
     hashes.push_back(endpos);
-    hashes.push_back(__ac_X31_hash_string(umistr));
+    size_t umi_strlen = strlen(str);
+    
+    if ((umi_strlen % 2 == 1) && (str[(umi_strlen - 1) / 2] == '+') && umi_strlen <= 16 * 2 - 3) {
+        char alpha[16] = {0};
+        char beta[16] = {0};
+        strncpy(alpha, umistr, (umi_strlen - 1) / 2);
+        strncpy(beta, umistr + (umi_strlen - 1) / 2 + 1, (umi_strlen - 1) / 2);
+        const char *abmin = ((strcmp(alpha, beta) <= 0) ? alpha : beta);
+        const char *abmax = ((strcmp(alpha, beta) >= 0) ? alpha : beta);
+        hashes.push_back(__ac_X31_hash_string(abmin));
+        hashes.push_back(__ac_X31_hash_string(abmax));
+    } else {
+        hashes.push_back(__ac_X31_hash_string(umistr));
+    }
     uint32_t k = hashes2hash(hashes);
     umihash = k;
     return (double)(k&0xffffff) / 0x1000000;
@@ -242,7 +255,7 @@ void help(int argc, char **argv) {
     fprintf(stderr, "Program %s version %s (%s)\n", argv[0], FULL_VERSION, COMMIT_DIFF_SH);
     fprintf(stderr, "  This is a NGS variant simulator that is aware of the molecular-barcodes (also known as unique molecular identifiers (UMIs))\n");
     
-    fprintf(stderr, "Usage: %s -b <INPUT-BAM> -v <INPUT-VCF> -1 <OUTPUT-R1-FASTQ> -2 <OUTPUT-R1-FASTQ>\n", argv[0]);
+    fprintf(stderr, "Usage: %s -b <INPUT-BAM> -v <INPUT-VCF> -1 <OUTPUT-R1-FASTQ> -2 <OUTPUT-R2-FASTQ.gz> -0 <OUTPUT-UNPAIRED-FASTQ.GZ>\n", argv[0]);
     fprintf(stderr, "Optional parameters:\n");
     fprintf(stderr, " -f Fraction of variant allele (FA) to simulate. "
             "This value is overriden by the INFO/FA tag (specified by the -F command-line parameter) in the INPUT-VCF. "
@@ -255,6 +268,7 @@ void help(int argc, char **argv) {
     
     fprintf(stderr, " -x Phred-scale sequencing error rates of simulated SNV variants "
             "where -2 means zero error and -1 means using sequencer BQ [default to %d].\n", DEFAULT_SNV_BQ_PHRED);
+    
     fprintf(stderr, " -i The base quality of the inserted bases in the simulated insertion variants. "
             "[default to %d].\n", DEFAULT_INS_BQ_PHRED);
     fprintf(stderr, " -A The number of reads used to generate the randomness for simulating the nominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_NITERS1);
@@ -270,7 +284,11 @@ void help(int argc, char **argv) {
     fprintf(stderr, "To detect UMI, this prgram first checks for the MI tag in each alignment record in <INPUT-BAM>. If the MI tag is absent, then the program checks for the string after the number-hash-pound sign (#) in the read name (QNAME).\n");
     fprintf(stderr, "Each variant record in the INPUT-VCF needs to have only one variant, it cannot be multiallelic.\n");
     fprintf(stderr, "Currently, the simulation of insertion/deletion variants causes longer/shorter-than-expected lengths of read template sequences due to preservation of alignment start and end positions on the reference genome.\n");
-    
+    fprintf(stderr, "The symbol '#' denotes the start of UMI sequence so that any string before the '#' symbol is discarded.\n");
+    fprintf(stderr, "The symbol '+' in a UMI sequence means that the UMI is a duplex, so the substrings before/after the '+' symbol are respectively the alpha/beta tags.\n");
+    fprintf(stderr, "The BAM tag MI has special meaning as mentioned in the BAM file format specification. "
+           "Therefore, for each BAM record, this program first searches for the MI tag. If the MI tag is not found, then this program uses the read name QNAME as the string containing UMI sequence\n");
+
     exit(-1);
 }
 
@@ -295,7 +313,7 @@ main(int argc, char **argv) {
     bool is_always_log = false;
     double powerlaw_exponent = DEFAULT_POWER_LAW_EXPONENT;
     double lognormal_disp = DEFAULT_LOGNORMAL_DISP;
-    while ((opt = getopt(argc, argv, "b:v:1:2:f:i:p:q:s:x:A:B:F:S:L")) != -1) {
+    while ((opt = getopt(argc, argv, "b:v:1:2:0:f:i:p:q:s:x:A:B:F:S:L")) != -1) {
         switch (opt) {
             case 'b': inbam = optarg; break;
             case 's': randseed = atoi(optarg); break;
@@ -393,7 +411,7 @@ main(int argc, char **argv) {
     
     while (sam_read1(bam_fp, bam_hdr, bam_rec1) >= 0) {
         const bam1_t *bam_rec = bam_rec1;
-        if (0 != (bam_rec->core.flag & 0x900)) { continue; }
+        if (0 != (bam_rec->core.flag & 0x904)) { continue; }
         auto &outfile = ((bam_rec->core.flag & 0x40) ? r1file : ((bam_rec->core.flag & 0x80) ? r2file : r0file));
         const char *outfname = ((bam_rec->core.flag & 0x40) ? r1outfq : ((bam_rec->core.flag & 0x80) ? r2outfq : r0outfq));
         
