@@ -70,16 +70,16 @@ uint32_t hashes2hash(std::vector<uint32_t>  hashes) {
 double umistr2prob(uint32_t &umihash, uint32_t randseed, uint32_t begpos, uint32_t endpos, const char *str) {
     
     const char *umistr1 = strchr(str, '#');
-    const char *umistr = (NULL == umistr1 ? str : umistr1);
+    const char *umistr = (NULL == umistr1 ? str : (umistr1 + 1));
     
     std::vector<uint32_t>  hashes;
     hashes.reserve(4 + 1);
     hashes.push_back(randseed);
     hashes.push_back(begpos);
     hashes.push_back(endpos);
-    size_t umi_strlen = strlen(str);
+    size_t umi_strlen = strlen(umistr);
     
-    if ((umi_strlen % 2 == 1) && (str[(umi_strlen - 1) / 2] == '+') && umi_strlen <= 16 * 2 - 3) {
+    if ((umi_strlen % 2 == 1) && (umistr[(umi_strlen - 1) / 2] == '+') && umi_strlen <= 16 * 2 - 3) {
         char alpha[16] = {0};
         char beta[16] = {0};
         strncpy(alpha, umistr, (umi_strlen - 1) / 2);
@@ -88,8 +88,10 @@ double umistr2prob(uint32_t &umihash, uint32_t randseed, uint32_t begpos, uint32
         const char *abmax = ((strcmp(alpha, beta) >= 0) ? alpha : beta);
         hashes.push_back(__ac_X31_hash_string(abmin));
         hashes.push_back(__ac_X31_hash_string(abmax));
+        //fprintf(stderr, "The read %s has one duplex UMI with length %d for UMI %s\n", umistr, umi_strlen, umistr);
     } else {
         hashes.push_back(__ac_X31_hash_string(umistr));
+        //fprintf(stderr, "The read %s has  NO duplex UMI with length %d for UMI %s\n", umistr, umi_strlen, umistr);
     }
     uint32_t k = hashes2hash(hashes);
     umihash = k;
