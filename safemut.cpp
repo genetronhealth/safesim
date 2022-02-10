@@ -413,7 +413,7 @@ main(int argc, char **argv) {
     
     while (sam_read1(bam_fp, bam_hdr, bam_rec1) >= 0) {
         const bam1_t *bam_rec = bam_rec1;
-        if (0 != (bam_rec->core.flag & 0x904)) { continue; }
+        if ((0 != (bam_rec->core.flag & 0x900)) && (0 == (bam_rec->core.flag & 0x4))) { continue; }
         auto &outfile = ((bam_rec->core.flag & 0x40) ? r1file : ((bam_rec->core.flag & 0x80) ? r2file : r0file));
         const char *outfname = ((bam_rec->core.flag & 0x40) ? r1outfq : ((bam_rec->core.flag & 0x80) ? r2outfq : r0outfq));
         
