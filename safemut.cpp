@@ -601,15 +601,13 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                         qpos++;
                         rpos++;
                     }
-                } else if (cigar_op == BAM_CINS) {
+                } else if ((cigar_op == BAM_CINS) || (cigar_op == BAM_CSOFT_CLIP)) {
                     for (int j = 0; j < cigar_oplen; j++) {
                         const char nuc = seq_nt16_str[bam_seqi(seq, qpos)];
                         newseq.push_back(seq_nt16_str[bam_seqi(seq, qpos)]);
                         newqual.push_back(qual[qpos]);
                         qpos++;
                     }
-                } else if (cigar_op == BAM_CSOFT_CLIP) {
-                    qpos += cigar_oplen; 
                 } else if (cigar_op == BAM_CDEL) {
                     rpos += cigar_oplen;
                 } else if (cigar_op == BAM_CHARD_CLIP) {
