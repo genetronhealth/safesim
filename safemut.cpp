@@ -416,7 +416,10 @@ main(int argc, char **argv) {
         if ((0 != (bam_rec->core.flag & 0x900)) && (0 == (bam_rec->core.flag & 0x4))) { continue; }
         auto &outfile = ((bam_rec->core.flag & 0x40) ? r1file : ((bam_rec->core.flag & 0x80) ? r2file : r0file));
         const char *outfname = ((bam_rec->core.flag & 0x40) ? r1outfq : ((bam_rec->core.flag & 0x80) ? r2outfq : r0outfq));
-        
+        if ((0 != (bam_rec->core.flag & 0x4))) {
+            int write_ret = bamrec_write_fastq_raw(bam_rec1, outfile);
+            continue;
+        }
         while (1) {
             if (vcf_read_ret != -1) {
                 fprintf(stderr, "The variant at tid %d pos %d is before the read at tid %d pos %d, readname = %s\n", 
