@@ -36,6 +36,7 @@ if [ $(echo "${1}" | grep skip-fastq-tools | wc -l) -eq 0 ]; then
     fi
     tar -xvf v0.8.3.tar.gz
     cd "${currdir}/ext/fastq-tools-0.8.3"
+    ./autogen.sh
     ./configure
     make -j 4
     cp src/fastq-sort "${currdir}/bin/"
