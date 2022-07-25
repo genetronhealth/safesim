@@ -1,7 +1,7 @@
-The safetools package currently contains two tools: safemut and safemix.
-The tools safemut and safemix are all aware of the unique molecular identifiers (UMIs) which are also known as molecular barcodes. 
-The tool safemut spikes variants from a VCF file into a BAM file by directly modifying read sequences in a UMI-aware manner. 
-The tool safemix mixes two BAM files in a predefined way to simulate variants at predefined fractions in a UMI-aware manner. 
+The SafeSim package currently contains two tools: SafeMut and SafeMix.
+The tools SafeMut and SafeMix are all aware of the unique molecular identifiers (UMIs) which are also known as molecular barcodes. 
+The tool SafeMut spikes variants specified in a VCF file into an existing BAM file (which is not supposed to contain any of the specified variants) by directly modifying read sequences in a UMI-aware manner. 
+The tool SafeMix mixes two BAM files in a predefined way to simulate variants at predefined fractions in a UMI-aware manner. 
 
 # How to install
 
@@ -19,7 +19,7 @@ In total, the installation should take about 4 minutes.
 
 # How to use
 
-Use bin/safemut -h and bin/safemix -h to see the tool-specific usage help.
+Use the bin/safemut -h and bin/safemix -h commands to see the tool-specific usage help.
 
 For UMI (unique molecular identifier, a.k.a. molecular barcode) to be detected, the read name (QNAME) in the input BAM file should be in the format of originalName#UMI.
 For example, the UMI-labeled read name can be
