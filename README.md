@@ -17,6 +17,8 @@ Although not required, it is highly recommmended that bcftools is installed at a
 
 In total, the installation should take about 4 minutes.
 
+Docker images containing pre-compiled binaries are provided at https://hub.docker.com/repository/docker/genetronhealth/safesim/
+
 # How to use
 
 Use the bin/safemut -h and bin/safemix -h commands to see the tool-specific usage help.
