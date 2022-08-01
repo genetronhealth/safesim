@@ -35,3 +35,11 @@ The word "safe" refers to the Safe-Sequencing System (Safe-SeqS) first described
 
 For more information, please check the wiki.
 
+
+# Contact: XiaoFei Zhao
+
+xiaofei DOT zhao AT genetronhealth DOT com
+
+x43zhao AT uwaterloo DOT ca
+
+cndfeifei AT gmail.com
