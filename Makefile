@@ -4,7 +4,7 @@ COMMIT_DIFF_FULL=$(shell echo "R\"ZXF_specQUOTE(\n $$(git diff HEAD | sed 's/ZXF
 
 CXX=g++
 LDFLAGS=-L ext/htslib-1.11-lowdep/ 
-CXXFLAGS=-static-libstdc++ -I ext/htslib-1.11-lowdep/ -pthread -lm -lz -lbz2 -llzma -lhts
+CXXFLAGS=-I ext/htslib-1.11-lowdep/ -pthread -lm -lz -lbz2 -llzma -static-libstdc++ -Bstatic -lhts
 VERFLAGS=-DCOMMIT_VERSION="\"$(COMMIT_VERSION)\"" -DCOMMIT_DIFF_SH="\"$(COMMIT_DIFF_SH)\"" -DCOMMIT_DIFF_FULL="\"$(COMMIT_DIFF_FULL)\""
 
 all: safemut safemut.debug safemix safemix.debug
