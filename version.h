@@ -1,3 +1,3 @@
-#define BASE_VERSION "0.1.5"
+#define BASE_VERSION "0.1.6"
 #define FULL_VERSION (BASE_VERSION "." COMMIT_VERSION)
 
