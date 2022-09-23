@@ -3,7 +3,7 @@ COMMIT_DIFF_SH=$(shell git diff HEAD --shortstat)
 COMMIT_DIFF_FULL=$(shell echo "R\"ZXF_specQUOTE(\n $$(git diff HEAD | sed 's/ZXF_specQUOTE/ZXF_specquote/g') \n)ZXF_specQUOTE\"" > gitdiff.txt)
 
 CXX=g++
-LDFLAGS= 
+LDFLAGS=-L ext/htslib-1.11-lowdep/ 
 CXXFLAGS=-static-libstdc++ -I ext/htslib-1.11-lowdep/ -pthread -lm -lz -lbz2 -llzma -lhts
 VERFLAGS=-DCOMMIT_VERSION="\"$(COMMIT_VERSION)\"" -DCOMMIT_DIFF_SH="\"$(COMMIT_DIFF_SH)\"" -DCOMMIT_DIFF_FULL="\"$(COMMIT_DIFF_FULL)\""
 
