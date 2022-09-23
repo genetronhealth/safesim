@@ -10,13 +10,13 @@ VERFLAGS=-DCOMMIT_VERSION="\"$(COMMIT_VERSION)\"" -DCOMMIT_DIFF_SH="\"$(COMMIT_D
 
 all: safemut safemut.debug safemix safemix.debug
 	
-safemut : safemut.cpp Makefile
+safemut : safemut.cpp Makefile version.h
 	$(CXX) -o safemut -O2 safemut.cpp $(CXXFLAGS) $(LDFLAGS) $(VERFLAGS)
-safemut.debug : safemut.cpp Makefile
+safemut.debug : safemut.cpp Makefile version.h
 	$(CXX) -o safemut.debug -O0 -g -p -fsanitize=address safemut.cpp $(CXXFLAGS) $(LDFLAGS) $(VERFLAGS)
-safemix : safemix.cpp Makefile
+safemix : safemix.cpp Makefile version.h
 	$(CXX) -o safemix -O2 safemix.cpp $(CXXFLAGS) $(LDFLAGS) $(VERFLAGS)
-safemix.debug : safemix.cpp Makefile
+safemix.debug : safemix.cpp Makefile version.h
 	$(CXX) -o safemix.debug -O0 -g -p -fsanitize=address safemix.cpp $(CXXFLAGS) $(LDFLAGS) $(VERFLAGS)
 
 .PHONY: clean deploy
