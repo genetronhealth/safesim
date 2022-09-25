@@ -10,9 +10,13 @@
 #include <math.h>
 #include <unistd.h>
 
+#if defined(__cplusplus) && (__cplusplus >= 201103L)
 const char *GIT_DIFF_FULL =
 #include "gitdiff.txt"
 ;
+#else
+const char *GIT_DIFF_FULL = "NotAvailable";
+#endif
 
 #define MIN(a, b) (((a)<(b)) ? (a) : (b))
 #define MAX(a, b) (((a)>(b)) ? (a) : (b))
