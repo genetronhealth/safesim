@@ -142,6 +142,7 @@ int sgn(double x) {
     if (0 == x) { return 0; }
     if (x > 0) { return  1; }
     if (x < 0) { return -1; }
+    return -2;
 }
 
 double 
@@ -238,7 +239,8 @@ int bamrec_write_fastq_raw(const bam1_t *aln, gzFile &outfile) {
         qual.push_back(c+33);
     }
     if ((aln->core.flag & 0x10)) { reverse(qual); }
-    gzprintf(outfile, "%s\n", qual.c_str());
+    int ret = gzprintf(outfile, "%s\n", qual.c_str());
+    return ret;
 }
 
 
@@ -255,7 +257,8 @@ int bamrec_write_fastq(const bam1_t *aln, std::string &seq, std::string &qual, g
     }
     gzprintf(outfile, "%s\n+\n", seq.c_str());
     if ((aln->core.flag & 0x10)) { reverse(qual); }
-    gzprintf(outfile, "%s\n", qual.c_str());
+    int ret = gzprintf(outfile, "%s\n", qual.c_str());
+    return ret;
 }
 
 void help(int argc, char **argv, int exit_code) {
@@ -413,7 +416,7 @@ main(int argc, char **argv) {
         }
         read_cnt += 1;
     }
-    fprintf(stderr, "The value samplehash1 and samplehash2 are %u and %u, read_cnt = %u\n", samplehash1, samplehash2, read_cnt);
+    fprintf(stderr, "The value samplehash1 and samplehash2 are %u and %u, read_cnt = %lu\n", samplehash1, samplehash2, read_cnt);
     bam_hdr_destroy(bam_hdr2);
     sam_close(bam_fp2);
     
@@ -428,10 +431,10 @@ main(int argc, char **argv) {
         }
         while (1) {
             if (vcf_read_ret != -1) {
-                fprintf(stderr, "The variant at tid %d pos %d is before the read at tid %d pos %d, readname = %s\n", 
+                fprintf(stderr, "The variant at tid %d pos %ld is before the read at tid %d pos %ld, readname = %s\n", 
                     vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_rec->core.pos, bam_get_qname(bam_rec));
                 vcf_read_ret = vcf_read(vcf_fp, vcf_hdr, vcf_rec); // skip this variant
-                fprintf(stderr, "The new prep variant is at tid %d pos %d\n", 
+                fprintf(stderr, "The new prep variant is at tid %d pos %ld\n", 
                     vcf_rec->rid, vcf_rec->pos);
             }
             if (vcf_read_ret < 0) { break; }
@@ -442,17 +445,17 @@ main(int argc, char **argv) {
         }
         while (is_var1_before_var2(vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_endpos(bam_rec))) {
             if (vcf_read_ret != -1) {
-                fprintf(stderr, "The variant at tid %d pos %d is before the read at tid %d endpos %d, readname = %s\n", 
+                fprintf(stderr, "The variant at tid %d pos %ld is before the read at tid %d endpos %ld, readname = %s\n", 
                     vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_endpos(bam_rec), bam_get_qname(bam_rec));
                 vcf_read_ret = vcf_read(vcf_fp, vcf_hdr, vcf_rec); // get this variant
-                fprintf(stderr, "The new pushed variant is at tid %d pos %d\n", 
+                fprintf(stderr, "The new pushed variant is at tid %d pos %ld\n", 
                     vcf_rec->rid, vcf_rec->pos);
             }
             if (vcf_read_ret < 0) { break; }
             vcf_list.push_back(bcf_dup(vcf_rec));
         }
         while (vcf_list.size() > 0 && is_var1_before_var2(vcf_list.front()->rid, vcf_list.front()->pos, bam_rec->core.tid, bam_rec->core.pos)) {
-            fprintf(stderr, "The variant at tid %d pos %d is destroyed\n", 
+            fprintf(stderr, "The variant at tid %d pos %ld is destroyed\n", 
                     vcf_list.front()->rid, vcf_list.front()->pos);
             bcf_destroy(vcf_list.front());
             vcf_list.pop_front();
@@ -542,11 +545,11 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     newqual.push_back(qual[qpos]);
                                     num_kept_snv++;
                                     if (ispowerof2(num_kept_snv) || is_always_log) { 
-                                        fprintf(stderr, "The read with name %s is spiked with the snv-variant at tid %d pos %d, FAs = %f,%f,%f\n", 
+                                        fprintf(stderr, "The read with name %s is spiked with the snv-variant at tid %d pos %ld, FAs = %f,%f,%f\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos, allelefrac, allelefrac2, allelefrac3);
                                     }
                                 } else if (strlen(newref) == strlen(newalt)) {
-                                    fprintf(stderr, "Warning: the MNV at tid %d pos %d is decomposed into SNV and only the first SNV is simulated\n", 
+                                    fprintf(stderr, "Warning: the MNV at tid %d pos %ld is decomposed into SNV and only the first SNV is simulated\n", 
                                             bam_rec->core.tid, bam_rec->core.pos);
                                     uint32_t hash = 0;
                                     double randprob = qnameqpos2prob(hash, randseed_basecall, bam_get_qname(bam_rec), qpos);
@@ -565,7 +568,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                         newqual.push_back((char)(ins_bq_phred)); 
                                     }
                                     num_kept_ins++;
-                                    if (ispowerof2(num_kept_ins) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the ins-variant at tid %d pos %d\n", 
+                                    if (ispowerof2(num_kept_ins) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the ins-variant at tid %d pos %ld\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); }
                                 } else if (strlen(newref) >  1 && strlen(newalt) == 1) {
                                     if (strlen(newref) + j < cigar_oplen1) {
@@ -576,21 +579,21 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                         qpos += strlen(newref) - 1;
                                         rpos += strlen(newref) - 1;
                                         num_kept_del++;
-                                        if (ispowerof2(num_kept_del) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the del-variant at tid %d pos %d\n", 
+                                        if (ispowerof2(num_kept_del) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the del-variant at tid %d pos %ld\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); }
                                     } else {
                                         newseq.push_back(seq_nt16_str[bam_seqi(seq, qpos)]);
                                         newqual.push_back(qual[qpos]);
                                     }
                                 } else {
-                                    fprintf(stderr, "The variant at tid %d pos %d failed to be processed!\n", bam_rec->core.tid, bam_rec->core.pos);
+                                    fprintf(stderr, "The variant at tid %d pos %ld failed to be processed!\n", bam_rec->core.tid, bam_rec->core.pos);
                                 }
                                 num_kept_reads++;
                                 is_mutated = true;
                                 break;
                             } else {
                                 if (ispowerof2(num_skip_reads) || is_always_log) {
-                                    fprintf(stderr, "The read with name %s is not affected by the variant at tid %d pos %d\n", 
+                                    fprintf(stderr, "The read with name %s is not affected by the variant at tid %d pos %ld\n", 
                                     bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); 
                                 }
                             }
@@ -622,7 +625,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                 } else if (cigar_op == BAM_CHARD_CLIP) {
                     // fall through
                 } else {
-                    fprintf(stderr, "The cigar code %d is invalid at tid %d pos %d for read %s!\n", 
+                    fprintf(stderr, "The cigar code %d is invalid at tid %d pos %ld for read %s!\n", 
                             cigar_op, bam_rec->core.tid, bam_rec->core.pos, bam_get_qname(bam_rec));
                     abort();
                 }
@@ -650,9 +653,9 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
     
     fprintf(stderr, "In total: kept %ld read support, skipped %ld read support"
             ", and skipped %ld no-variant CMATCH cigars.\n", num_kept_reads, num_skip_reads, num_skip_cmatches);
-    fprintf(stderr, "Kept %d snv read support\n", num_kept_snv);
-    fprintf(stderr, "Kept %d mnv read support\n", num_kept_mnv);
-    fprintf(stderr, "Kept %d insertion read support\n", num_kept_ins);
-    fprintf(stderr, "Kept %d deletion read support\n", num_kept_del);
+    fprintf(stderr, "Kept %ld snv read support\n", num_kept_snv);
+    fprintf(stderr, "Kept %ld mnv read support\n", num_kept_mnv);
+    fprintf(stderr, "Kept %ld insertion read support\n", num_kept_ins);
+    fprintf(stderr, "Kept %ld deletion read support\n", num_kept_del);
 }
 

@@ -172,7 +172,7 @@ main(int argc, char **argv) {
             if (prob1 < umi_draw_prob && prob2 < read_draw_given_umi_prob) {
                 int write_ret = sam_write1(outbam_fp, bam_hdr, bam_rec);
                 if (write_ret < 0) {
-                    fprintf(stderr, "Failed to write the read %s at tid %d pos %d to the file %s\n", bam_get_qname(bam_rec), bam_rec->core.tid, bam_rec->core.pos, outbam);
+                    fprintf(stderr, "Failed to write the read %s at tid %d pos %ld to the file %s\n", bam_get_qname(bam_rec), bam_rec->core.tid, bam_rec->core.pos, outbam);
                     abort();
                 }
             }
