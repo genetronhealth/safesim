@@ -10,9 +10,13 @@
 #include <math.h>
 #include <unistd.h>
 
+#if defined(__cplusplus) && (__cplusplus >= 201103L)
 const char *GIT_DIFF_FULL =
 #include "gitdiff.txt"
 ;
+#else
+const char *GIT_DIFF_FULL = "NotAvailable";
+#endif
 
 #define MIN(a, b) (((a)<(b)) ? (a) : (b))
 #define MAX(a, b) (((a)>(b)) ? (a) : (b))
@@ -52,26 +56,26 @@ typedef struct {
 
 const arg_default_vals_t arg_default_vals;
 
-void help(int argc, char **argv) {
-    fprintf(stderr, "Program %s version %s (%s)\n", argv[0], FULL_VERSION, COMMIT_DIFF_SH);
-    fprintf(stderr, "  This program mixes two bam files and is aware of the molecular-barcodes (also known as unique molecular identifiers (UMIs))\n");
+void help(int argc, char **argv, int exit_code) {
+    fprintf(stdout, "Program %s version %s (%s)\n", argv[0], FULL_VERSION, COMMIT_DIFF_SH);
+    fprintf(stdout, "  This program mixes two bam files and is aware of the molecular-barcodes (also known as unique molecular identifiers (UMIs))\n");
     
-    fprintf(stderr, "Usage: %s -o <OUTPUT-PREFIX> -a <tumor-INPUT-BAM> -b <normal-INPUT-BAM>\n", argv[0]);
-    fprintf(stderr, "Optional parameters:\n");
-    fprintf(stderr, "  -d <tumor-umi-size> average number of reads in a UMI family in the <TUMOR-INPUT-BAM> file [default to %f]\n", arg_default_vals.d); 
-    fprintf(stderr, "  -e <normal-umi-size> average number of reads in a UMI family in the <NORMAL-INPUT-BAM> file [default to %f]\n", arg_default_vals.e);
-    fprintf(stderr, "  -f <tumor-fraction> the fraction of DNA that comes from tumor [default to %f]\n", arg_default_vals.f); 
-    fprintf(stderr, "  -i <tumor-initial-quantity> initial quantity of DNA in ng sequenced in the <TUMOR-INPUT-BAM> file [default to %f]\n", arg_default_vals.i);
-    fprintf(stderr, "  -j <normal-initial-quantity> initial quantity of DNA in ng sequenced in the <NORMAL-INPUT-BAM> file [default to %f]\n",  arg_default_vals.j);
-    fprintf(stderr, "  -r <random-seed-for-initial-quantity> random seed used to select the UMI from the initial quantity of DNA [default to %d]\n", arg_default_vals.r);
-    fprintf(stderr, "  -s <random-seed-for-umi-size>\n random seed used to select the reads in each UMI [default to %d]\n",  arg_default_vals.s);
-    fprintf(stderr, "  -U <use-only-umi>\n set the program to use only UMIs for identifying read families (discard read start and end positions) [default to unset]\n");
+    fprintf(stdout, "Usage: %s -o <OUTPUT-PREFIX> -a <tumor-INPUT-BAM> -b <normal-INPUT-BAM>\n", argv[0]);
+    fprintf(stdout, "Optional parameters:\n");
+    fprintf(stdout, "  -d <tumor-umi-size> average number of reads in a UMI family in the <TUMOR-INPUT-BAM> file [default to %f]\n", arg_default_vals.d); 
+    fprintf(stdout, "  -e <normal-umi-size> average number of reads in a UMI family in the <NORMAL-INPUT-BAM> file [default to %f]\n", arg_default_vals.e);
+    fprintf(stdout, "  -f <tumor-fraction> the fraction of DNA that comes from tumor [default to %f]\n", arg_default_vals.f); 
+    fprintf(stdout, "  -i <tumor-initial-quantity> initial quantity of DNA in ng sequenced in the <TUMOR-INPUT-BAM> file [default to %f]\n", arg_default_vals.i);
+    fprintf(stdout, "  -j <normal-initial-quantity> initial quantity of DNA in ng sequenced in the <NORMAL-INPUT-BAM> file [default to %f]\n",  arg_default_vals.j);
+    fprintf(stdout, "  -r <random-seed-for-initial-quantity> random seed used to select the UMI from the initial quantity of DNA [default to %d]\n", arg_default_vals.r);
+    fprintf(stdout, "  -s <random-seed-for-umi-size>\n random seed used to select the reads in each UMI [default to %d]\n",  arg_default_vals.s);
+    fprintf(stdout, "  -U <use-only-umi>\n set the program to use only UMIs for identifying read families (discard read start and end positions) [default to unset]\n");
     
-    fprintf(stderr, "Note:\n");
-    fprintf(stderr, "<tumor-INPUT-BAM> and <normal-INPUT-BAM> both have to be sorted and indexed.\n");
-    fprintf(stderr, "To detect UMI, this prgram first checks for the MI tag in each alignment record in <tumor-INPUT-BAM> and <normal-INPUT-BAM>. If the MI tag is absent, then the program checks for the string after the number-hash-pound sign (#) in the read name (QNAME).\n");
-    fprintf(stderr, "<OUTPUT-PREFIX> is appended by the string literals \".tumor.bam\" and \".normal.bam\" (without the double quotes) to generate the tumor and normal simulated BAM filenames, respectively. The tumor and normal bam files have to be merged (e.g., by samtools merge) to simulate the sequenced sample. \n");
-    exit(-1);
+    fprintf(stdout, "Note:\n");
+    fprintf(stdout, "<tumor-INPUT-BAM> and <normal-INPUT-BAM> both have to be sorted and indexed.\n");
+    fprintf(stdout, "To detect UMI, this prgram first checks for the MI tag in each alignment record in <tumor-INPUT-BAM> and <normal-INPUT-BAM>. If the MI tag is absent, then the program checks for the string after the number-hash-pound sign (#) in the read name (QNAME).\n");
+    fprintf(stdout, "<OUTPUT-PREFIX> is appended by the string literals \".tumor.bam\" and \".normal.bam\" (without the double quotes) to generate the tumor and normal simulated BAM filenames, respectively. The tumor and normal bam files have to be merged (e.g., by samtools merge) to simulate the sequenced sample. \n");
+    exit(exit_code);
 }
 
 typedef struct {
@@ -96,8 +100,9 @@ main(int argc, char **argv) {
     uint32_t randseed2 = arg_default_vals.s;
     int use_only_umi = 0;
     
-    while ((opt = getopt(argc, argv, "a:b:d:e:f:i:j:o:r:s:U")) != -1) {
+    while ((opt = getopt(argc, argv, "ha:b:d:e:f:i:j:o:r:s:U")) != -1) {
         switch (opt) {
+            case 'h': help(argc, argv, 0);
             case 'a': tbam = optarg; break;
             case 'b': nbam = optarg; break;
             case 'd': tosd = atof(optarg); break;
@@ -109,11 +114,11 @@ main(int argc, char **argv) {
             case 'r': randseed1 = atoi(optarg); break;
             case 's': randseed2 = atoi(optarg); break;
             case 'U': use_only_umi = 1; break;
-            default: help(argc, argv);
+            default: help(argc, argv, -1);
         }
     }
     if (NULL == tbam || NULL == nbam || NULL == outpref) {
-        help(argc, argv);
+        help(argc, argv, -1);
     }
     if (0 != randseed1) {
         portable_srand(randseed1);
@@ -167,7 +172,7 @@ main(int argc, char **argv) {
             if (prob1 < umi_draw_prob && prob2 < read_draw_given_umi_prob) {
                 int write_ret = sam_write1(outbam_fp, bam_hdr, bam_rec);
                 if (write_ret < 0) {
-                    fprintf(stderr, "Failed to write the read %s at tid %d pos %d to the file %s\n", bam_get_qname(bam_rec), bam_rec->core.tid, bam_rec->core.pos, outbam);
+                    fprintf(stderr, "Failed to write the read %s at tid %d pos %ld to the file %s\n", bam_get_qname(bam_rec), bam_rec->core.tid, bam_rec->core.pos, outbam);
                     abort();
                 }
             }

@@ -28,9 +28,14 @@ for each read in the sorted bam
     flush out this bam read
 **/
 
+
+#if defined(__cplusplus) && (__cplusplus >= 201103L)
 const char *GIT_DIFF_FULL =
 #include "gitdiff.txt"
 ;
+#else
+const char *GIT_DIFF_FULL = "NotAvailable";
+#endif
 
 #define MIN(a, b) (((a) < (b)) ? (a) : (b))
 #define MAX(a, b) (((a) > (b)) ? (a) : (b))
@@ -137,6 +142,7 @@ int sgn(double x) {
     if (0 == x) { return 0; }
     if (x > 0) { return  1; }
     if (x < 0) { return -1; }
+    return -2;
 }
 
 double 
@@ -233,7 +239,8 @@ int bamrec_write_fastq_raw(const bam1_t *aln, gzFile &outfile) {
         qual.push_back(c+33);
     }
     if ((aln->core.flag & 0x10)) { reverse(qual); }
-    gzprintf(outfile, "%s\n", qual.c_str());
+    int ret = gzprintf(outfile, "%s\n", qual.c_str());
+    return ret;
 }
 
 
@@ -250,48 +257,49 @@ int bamrec_write_fastq(const bam1_t *aln, std::string &seq, std::string &qual, g
     }
     gzprintf(outfile, "%s\n+\n", seq.c_str());
     if ((aln->core.flag & 0x10)) { reverse(qual); }
-    gzprintf(outfile, "%s\n", qual.c_str());
+    int ret = gzprintf(outfile, "%s\n", qual.c_str());
+    return ret;
 }
 
-void help(int argc, char **argv) {
-    fprintf(stderr, "Program %s version %s (%s)\n", argv[0], FULL_VERSION, COMMIT_DIFF_SH);
-    fprintf(stderr, "  This is a NGS variant simulator that is aware of the molecular-barcodes (also known as unique molecular identifiers (UMIs))\n");
+void help(int argc, char **argv, int exit_code) {
+    fprintf(stdout, "Program %s version %s (%s)\n", argv[0], FULL_VERSION, COMMIT_DIFF_SH);
+    fprintf(stdout, "  This is a NGS variant simulator that is aware of the molecular-barcodes (also known as unique molecular identifiers (UMIs))\n");
     
-    fprintf(stderr, "Usage: %s -b <INPUT-BAM> -v <INPUT-VCF> -1 <OUTPUT-R1-FASTQ> -2 <OUTPUT-R2-FASTQ.gz> -0 <OUTPUT-UNPAIRED-FASTQ.GZ>\n", argv[0]);
-    fprintf(stderr, "Optional parameters:\n");
-    fprintf(stderr, " -f Fraction of variant allele (FA) to simulate. "
+    fprintf(stdout, "Usage: %s -b <INPUT-BAM> -v <INPUT-VCF> -1 <OUTPUT-R1-FASTQ> -2 <OUTPUT-R2-FASTQ.gz> -0 <OUTPUT-UNPAIRED-FASTQ.GZ>\n", argv[0]);
+    fprintf(stdout, "Optional parameters:\n");
+    fprintf(stdout, " -f Fraction of variant allele (FA) to simulate. "
             "This value is overriden by the INFO/FA tag (specified by the -F command-line parameter) in the INPUT-VCF. "
             "Please note that INFO/FA must be defined the header of INPUT-VCF to be effective. "
             "Otherwise, the value defined by -f is used in the simulation [default to %f].\n", DEFAULT_ALLELE_FRAC);
-    fprintf(stderr, " -p The power-law exponent simulating the over-dispersion of allele fractions in NGS [default to %f] (https://doi.org/10.1093/bib/bbab458). Negative value means that no over-dispersion is simulated. \n", DEFAULT_POWER_LAW_EXPONENT);
-    fprintf(stderr, " -q the log-normal over-dispersion parameter in Phred scale [default to %f] (https://doi.org/10.1093/bib/bbab458). Negative value means that no over-dispersion is simulated. \n", DEFAULT_LOGNORMAL_DISP);
-    fprintf(stderr, " -s The random seed used to simulate allele fractions from read names labeled with UMIs [default to %u].\n", DEFAULT_RANDSEED);
+    fprintf(stdout, " -p The power-law exponent simulating the over-dispersion of allele fractions in NGS [default to %f] (https://doi.org/10.1093/bib/bbab458). Negative value means that no over-dispersion is simulated. \n", DEFAULT_POWER_LAW_EXPONENT);
+    fprintf(stdout, " -q the log-normal over-dispersion parameter in Phred scale [default to %f] (https://doi.org/10.1093/bib/bbab458). Negative value means that no over-dispersion is simulated. \n", DEFAULT_LOGNORMAL_DISP);
+    fprintf(stdout, " -s The random seed used to simulate allele fractions from read names labeled with UMIs [default to %u].\n", DEFAULT_RANDSEED);
 
     
-    fprintf(stderr, " -x Phred-scale sequencing error rates of simulated SNV variants "
+    fprintf(stdout, " -x Phred-scale sequencing error rates of simulated SNV variants "
             "where -2 means zero error and -1 means using sequencer BQ [default to %d].\n", DEFAULT_SNV_BQ_PHRED);
     
-    fprintf(stderr, " -i The base quality of the inserted bases in the simulated insertion variants. "
+    fprintf(stdout, " -i The base quality of the inserted bases in the simulated insertion variants. "
             "[default to %d].\n", DEFAULT_INS_BQ_PHRED);
-    fprintf(stderr, " -A The number of reads used to generate the randomness for simulating the nominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_NITERS1);
-    fprintf(stderr, " -B The number of reads used to generate the randomness for simulating the denominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_NITERS2);
-    fprintf(stderr, " -C The random seed used to simulate basecalling error [default to %u].\n", DEFAULT_RANDSEED);
-    fprintf(stderr, " -F allele fraction TAG in the VCF file. " "[default to FA].\n");
-    fprintf(stderr, " -S sample name used for the -F command-line parameter. "
+    fprintf(stdout, " -A The number of reads used to generate the randomness for simulating the nominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_NITERS1);
+    fprintf(stdout, " -B The number of reads used to generate the randomness for simulating the denominator of the allele fraction used with the -p cmd-line param [default to %u].\n", DEFAULT_NITERS2);
+    fprintf(stdout, " -C The random seed used to simulate basecalling error [default to %u].\n", DEFAULT_RANDSEED);
+    fprintf(stdout, " -F allele fraction TAG in the VCF file. " "[default to FA].\n");
+    fprintf(stdout, " -S sample name used for the -F command-line parameter. "
                     "The special values NULL pointer, empty-string, and INFO mean using the INFO column instead of the FORMAT column." "[default to NULL pointer].\n");
     
-    fprintf(stderr, "Note:\n");
-    fprintf(stderr, "Reads in <OUTPUT-R1-FASTQ> and <OUTPUT-R2-FASTQ> are not in the same order, so these output FASTQ files have to be sorted using a tool such as fastq-sort before being aligned again, as most aligners such as BWA and Bowtie2 require reads in the R1 and R2 files to be in the same order (This is VERY IMPORTANT!).\n");
-    fprintf(stderr, "<INPUT-BAM> and <INPUT-VCF> both have to be sorted and indexed.\n");
-    fprintf(stderr, "To detect UMI, this prgram first checks for the MI tag in each alignment record in <INPUT-BAM>. If the MI tag is absent, then the program checks for the string after the number-hash-pound sign (#) in the read name (QNAME).\n");
-    fprintf(stderr, "Each variant record in the INPUT-VCF needs to have only one variant, it cannot be multiallelic.\n");
-    fprintf(stderr, "Currently, the simulation of insertion/deletion variants causes longer/shorter-than-expected lengths of read template sequences due to preservation of alignment start and end positions on the reference genome.\n");
-    fprintf(stderr, "The symbol '#' denotes the start of UMI sequence so that any string before the '#' symbol is discarded.\n");
-    fprintf(stderr, "The symbol '+' in a UMI sequence means that the UMI is a duplex, so the substrings before/after the '+' symbol are respectively the alpha/beta tags.\n");
-    fprintf(stderr, "The BAM tag MI has special meaning as mentioned in the BAM file format specification. "
-           "Therefore, for each BAM record, this program first searches for the MI tag. If the MI tag is not found, then this program uses the read name QNAME as the string containing UMI sequence\n");
-
-    exit(-1);
+    fprintf(stdout, "Note:\n");
+    fprintf(stdout, "Reads in <OUTPUT-R1-FASTQ> and <OUTPUT-R2-FASTQ> are not in the same order, so these output FASTQ files have to be sorted using a tool such as fastq-sort before being aligned again, as most aligners such as BWA and Bowtie2 require reads in the R1 and R2 files to be in the same order (This is VERY IMPORTANT!).\n");
+    fprintf(stdout, "<INPUT-BAM> and <INPUT-VCF> both have to be sorted and indexed.\n");
+    fprintf(stdout, "To detect UMI, this prgram first checks for the MI tag in each alignment record in <INPUT-BAM>. If the MI tag is absent, then the program checks for the string after the number-hash-pound sign (#) in the read name (QNAME).\n");
+    fprintf(stdout, "Each variant record in the INPUT-VCF needs to have only one variant, it cannot be multiallelic.\n");
+    fprintf(stdout, "Currently, the simulation of insertion/deletion variants causes longer/shorter-than-expected lengths of read template sequences due to preservation of alignment start and end positions on the reference genome.\n");
+    fprintf(stdout, "The symbol '#' denotes the start of UMI sequence so that any string before the '#' symbol is discarded.\n");
+    fprintf(stdout, "The symbol '+' in a UMI sequence means that the UMI is a duplex, so the substrings before/after the '+' symbol are respectively the alpha/beta tags.\n");
+    fprintf(stdout, "The BAM tag MI has special meaning as mentioned in the BAM file format specification."
+           "Therefore, for each BAM record, this program first searches for the MI tag. If the MI tag is not found, then this program uses the read name QNAME as the string containing UMI sequence.\n");
+    fprintf(stdout, "The -v command-line parameter without any other comamnd-line parameter means 'print version then exit with zero'.\n");
+    exit(exit_code);
 }
 
 int 
@@ -315,35 +323,36 @@ main(int argc, char **argv) {
     bool is_always_log = false;
     double powerlaw_exponent = DEFAULT_POWER_LAW_EXPONENT;
     double lognormal_disp = DEFAULT_LOGNORMAL_DISP;
-    while ((opt = getopt(argc, argv, "b:v:1:2:0:f:i:p:q:s:x:A:B:F:S:L")) != -1) {
+    while ((opt = getopt(argc, argv, "h0:1:2:b:f:i:p:q:s:v:x:A:B:C:F:L:S:")) != -1) {
         switch (opt) {
-            case 'b': inbam = optarg; break;
-            case 's': randseed = atoi(optarg); break;
-            case 'A': rand_niters1 = atoi(optarg); break;
-            case 'B': rand_niters2 = atoi(optarg); break;
-            case 'C': randseed_basecall = atoi(optarg); break;
-            case 'v': invcf = optarg; break;
+            case 'h': help(argc, argv, 0);
             case '0': r0outfq = optarg; break;
             case '1': r1outfq = optarg; break;
             case '2': r2outfq = optarg; break;
+            case 'b': inbam = optarg; break; // required            
             case 'f': defallelefrac = atof(optarg); break;
             case 'i': ins_bq_phred = atof(optarg); break;
             case 'p': powerlaw_exponent = atof(optarg); break;
             case 'q': lognormal_disp = atof(optarg); break;
+            case 's': randseed = atoi(optarg); break;
+            case 'v': invcf = optarg; break; // required
             case 'x': snv_bq_phred = atof(optarg); break;
+            case 'A': rand_niters1 = atoi(optarg); break;
+            case 'B': rand_niters2 = atoi(optarg); break;
+            case 'C': randseed_basecall = atoi(optarg); break;
             case 'F': tagFA = optarg; break;
-            case 'L': is_always_log = true; break;
+            case 'L': is_always_log = true; break; // developer debug-mode flag which is not on the cmd-line help
             case 'S': tagsample = optarg; break;
-            default: help(argc, argv);
+            default: help(argc, argv, -1);
         }
     }
     if (NULL == inbam || NULL == invcf) {
         fprintf(stderr, "The input BAM and VCF filenames have to be specified on the command line\n");
-        help(argc, argv);
+        help(argc, argv, -1);
     }
     if ((NULL == r0outfq) && (NULL == r1outfq) && (NULL == r2outfq)) {
         fprintf(stderr, "At least one output FASTQ file has to be specified on the command line\n");
-        help(argc, argv);
+        help(argc, argv, -1);
     }
     double lnfrac = pow(10.0, -lognormal_disp / 10.0);
     double lnsigma = log(2.0) / sqrt(log(lnfrac) / (-1.0/2.0));
@@ -407,7 +416,7 @@ main(int argc, char **argv) {
         }
         read_cnt += 1;
     }
-    fprintf(stderr, "The value samplehash1 and samplehash2 are %u and %u, read_cnt = %u\n", samplehash1, samplehash2, read_cnt);
+    fprintf(stderr, "The value samplehash1 and samplehash2 are %u and %u, read_cnt = %lu\n", samplehash1, samplehash2, read_cnt);
     bam_hdr_destroy(bam_hdr2);
     sam_close(bam_fp2);
     
@@ -422,10 +431,10 @@ main(int argc, char **argv) {
         }
         while (1) {
             if (vcf_read_ret != -1) {
-                fprintf(stderr, "The variant at tid %d pos %d is before the read at tid %d pos %d, readname = %s\n", 
+                fprintf(stderr, "The variant at tid %d pos %ld is before the read at tid %d pos %ld, readname = %s\n", 
                     vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_rec->core.pos, bam_get_qname(bam_rec));
                 vcf_read_ret = vcf_read(vcf_fp, vcf_hdr, vcf_rec); // skip this variant
-                fprintf(stderr, "The new prep variant is at tid %d pos %d\n", 
+                fprintf(stderr, "The new prep variant is at tid %d pos %ld\n", 
                     vcf_rec->rid, vcf_rec->pos);
             }
             if (vcf_read_ret < 0) { break; }
@@ -436,17 +445,17 @@ main(int argc, char **argv) {
         }
         while (is_var1_before_var2(vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_endpos(bam_rec))) {
             if (vcf_read_ret != -1) {
-                fprintf(stderr, "The variant at tid %d pos %d is before the read at tid %d endpos %d, readname = %s\n", 
+                fprintf(stderr, "The variant at tid %d pos %ld is before the read at tid %d endpos %ld, readname = %s\n", 
                     vcf_rec->rid, vcf_rec->pos, bam_rec->core.tid, bam_endpos(bam_rec), bam_get_qname(bam_rec));
                 vcf_read_ret = vcf_read(vcf_fp, vcf_hdr, vcf_rec); // get this variant
-                fprintf(stderr, "The new pushed variant is at tid %d pos %d\n", 
+                fprintf(stderr, "The new pushed variant is at tid %d pos %ld\n", 
                     vcf_rec->rid, vcf_rec->pos);
             }
             if (vcf_read_ret < 0) { break; }
             vcf_list.push_back(bcf_dup(vcf_rec));
         }
         while (vcf_list.size() > 0 && is_var1_before_var2(vcf_list.front()->rid, vcf_list.front()->pos, bam_rec->core.tid, bam_rec->core.pos)) {
-            fprintf(stderr, "The variant at tid %d pos %d is destroyed\n", 
+            fprintf(stderr, "The variant at tid %d pos %ld is destroyed\n", 
                     vcf_list.front()->rid, vcf_list.front()->pos);
             bcf_destroy(vcf_list.front());
             vcf_list.pop_front();
@@ -536,11 +545,11 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                     newqual.push_back(qual[qpos]);
                                     num_kept_snv++;
                                     if (ispowerof2(num_kept_snv) || is_always_log) { 
-                                        fprintf(stderr, "The read with name %s is spiked with the snv-variant at tid %d pos %d, FAs = %f,%f,%f\n", 
+                                        fprintf(stderr, "The read with name %s is spiked with the snv-variant at tid %d pos %ld, FAs = %f,%f,%f\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos, allelefrac, allelefrac2, allelefrac3);
                                     }
                                 } else if (strlen(newref) == strlen(newalt)) {
-                                    fprintf(stderr, "Warning: the MNV at tid %d pos %d is decomposed into SNV and only the first SNV is simulated\n", 
+                                    fprintf(stderr, "Warning: the MNV at tid %d pos %ld is decomposed into SNV and only the first SNV is simulated\n", 
                                             bam_rec->core.tid, bam_rec->core.pos);
                                     uint32_t hash = 0;
                                     double randprob = qnameqpos2prob(hash, randseed_basecall, bam_get_qname(bam_rec), qpos);
@@ -559,7 +568,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                         newqual.push_back((char)(ins_bq_phred)); 
                                     }
                                     num_kept_ins++;
-                                    if (ispowerof2(num_kept_ins) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the ins-variant at tid %d pos %d\n", 
+                                    if (ispowerof2(num_kept_ins) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the ins-variant at tid %d pos %ld\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); }
                                 } else if (strlen(newref) >  1 && strlen(newalt) == 1) {
                                     if (strlen(newref) + j < cigar_oplen1) {
@@ -570,21 +579,21 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                                         qpos += strlen(newref) - 1;
                                         rpos += strlen(newref) - 1;
                                         num_kept_del++;
-                                        if (ispowerof2(num_kept_del) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the del-variant at tid %d pos %d\n", 
+                                        if (ispowerof2(num_kept_del) || is_always_log) { fprintf(stderr, "The read with name %s is spiked with the del-variant at tid %d pos %ld\n", 
                                                 bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); }
                                     } else {
                                         newseq.push_back(seq_nt16_str[bam_seqi(seq, qpos)]);
                                         newqual.push_back(qual[qpos]);
                                     }
                                 } else {
-                                    fprintf(stderr, "The variant at tid %d pos %d failed to be processed!\n", bam_rec->core.tid, bam_rec->core.pos);
+                                    fprintf(stderr, "The variant at tid %d pos %ld failed to be processed!\n", bam_rec->core.tid, bam_rec->core.pos);
                                 }
                                 num_kept_reads++;
                                 is_mutated = true;
                                 break;
                             } else {
                                 if (ispowerof2(num_skip_reads) || is_always_log) {
-                                    fprintf(stderr, "The read with name %s is not affected by the variant at tid %d pos %d\n", 
+                                    fprintf(stderr, "The read with name %s is not affected by the variant at tid %d pos %ld\n", 
                                     bam_get_qname(bam_rec), vcf_rec->rid, vcf_rec->pos); 
                                 }
                             }
@@ -616,7 +625,7 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
                 } else if (cigar_op == BAM_CHARD_CLIP) {
                     // fall through
                 } else {
-                    fprintf(stderr, "The cigar code %d is invalid at tid %d pos %d for read %s!\n", 
+                    fprintf(stderr, "The cigar code %d is invalid at tid %d pos %ld for read %s!\n", 
                             cigar_op, bam_rec->core.tid, bam_rec->core.pos, bam_get_qname(bam_rec));
                     abort();
                 }
@@ -644,9 +653,9 @@ for (auto vcf_rec_it2 = vcf_rec_it; vcf_rec_it2 != vcf_rec_it_end; vcf_rec_it2++
     
     fprintf(stderr, "In total: kept %ld read support, skipped %ld read support"
             ", and skipped %ld no-variant CMATCH cigars.\n", num_kept_reads, num_skip_reads, num_skip_cmatches);
-    fprintf(stderr, "Kept %d snv read support\n", num_kept_snv);
-    fprintf(stderr, "Kept %d mnv read support\n", num_kept_mnv);
-    fprintf(stderr, "Kept %d insertion read support\n", num_kept_ins);
-    fprintf(stderr, "Kept %d deletion read support\n", num_kept_del);
+    fprintf(stderr, "Kept %ld snv read support\n", num_kept_snv);
+    fprintf(stderr, "Kept %ld mnv read support\n", num_kept_mnv);
+    fprintf(stderr, "Kept %ld insertion read support\n", num_kept_ins);
+    fprintf(stderr, "Kept %ld deletion read support\n", num_kept_del);
 }
 
