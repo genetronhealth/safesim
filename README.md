@@ -1,3 +1,5 @@
+[![install with bioconda](https://img.shields.io/badge/install%20with-bioconda-brightgreen.svg?style=flat)](http://bioconda.github.io/recipes/safesim/README.html)
+
 The SafeSim package currently contains two tools: SafeMut and SafeMix.
 The tools SafeMut and SafeMix are all aware of the unique molecular identifiers (UMIs) which are also known as molecular barcodes. 
 The tool SafeMut spikes variants specified in a VCF file into an existing BAM file (which is not supposed to contain any of the specified variants) by directly modifying read sequences in a UMI-aware manner. 
