@@ -35,6 +35,10 @@ Please note that INFO/FA must be defined the header of the input VCF file in ord
 
 The word "safe" refers to the Safe-Sequencing System (Safe-SeqS) first described at https://doi.org/10.1073/pnas.1105422108 
 
+Compared with other simulators, SafeMut is characterized by awareness of unique molecular identifiers (UMIs) and allele-fraction (AF) overdispersion. 
+By being aware of UMI, SafeMut can simulate mutations in cfDNA. 
+By being aware of AF overdispersion, SafeMut provides more realistic simulation. 
+
 For more information, please check the wiki.
 
 
