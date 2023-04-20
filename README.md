@@ -42,10 +42,14 @@ By being aware of AF overdispersion, SafeMut provides more realistic simulation.
 For more information, please check the wiki.
 
 
+# Patent
+
+[1]赵霄飞, 郭靖宇, 王思振. 一种可保留分子标签信息的在测序数据中模拟小变异的方法,装置及计算机可读存储介质:. CN 111718982 A,20200929;CN 110491441 A,20191122
+
 # Contact: XiaoFei Zhao
 
-xiaofei DOT zhao AT genetronhealth DOT com
+x43zhao AT uwaterloo DOT ca (first email to be reached at)
 
-x43zhao AT uwaterloo DOT ca
+cndfeifei AT gmail DOT com (if the above email does not work)
 
-cndfeifei AT gmail DOT com
+xiaofei DOT zhao AT genetronhealth DOT com (if the above email does not work)
