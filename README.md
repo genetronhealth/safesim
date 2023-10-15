@@ -42,6 +42,17 @@ By being aware of AF overdispersion, SafeMut provides more realistic simulation.
 For more information, please check the wiki.
 
 
+# Publication
+
+Xiaofei Zhao, Jingyu Guo, Sizhen Wang,
+SafeMut: UMI-aware variant simulator incorporating allele-fraction overdispersion in read editing,
+Informatics in Medicine Unlocked,
+Volume 41,
+2023,
+101307,
+ISSN 2352-9148,
+https://doi.org/10.1016/j.imu.2023.101307
+
 # Patent
 
 [1]赵霄飞, 郭靖宇, 王思振. 一种可保留分子标签信息的在测序数据中模拟小变异的方法,装置及计算机可读存储介质:. CN115458051A
